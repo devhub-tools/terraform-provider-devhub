@@ -23,7 +23,7 @@ jobs:
       - run: go build -v .
 
       - name: Run linters
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
 
   generate:
     runs-on: ubuntu-latest
@@ -66,13 +66,13 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
-      - uses: hashicorp/setup-terraform@v2
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ matrix.terraform }}
           terraform_wrapper: false
 
       - run: go mod download
-      
+
       - env:
           TF_ACC: "1"
         run: go test -v -cover ./internal/provider/
