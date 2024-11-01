@@ -27,8 +27,8 @@ func (c *Client) GetDatabase(databaseId string) (*Database, error) {
 	return &database, nil
 }
 
-func (c *Client) CreateDatabase(database Database) (*Database, error) {
-	rb, err := json.Marshal(database)
+func (c *Client) CreateDatabase(input Database) (*Database, error) {
+	rb, err := json.Marshal(input)
 	if err != nil {
 		return nil, err
 	}
@@ -43,17 +43,17 @@ func (c *Client) CreateDatabase(database Database) (*Database, error) {
 		return nil, err
 	}
 
-	newDatabase := Database{}
-	err = json.Unmarshal(body, &newDatabase)
+	database := Database{}
+	err = json.Unmarshal(body, &database)
 	if err != nil {
 		return nil, err
 	}
 
-	return &newDatabase, nil
+	return &database, nil
 }
 
-func (c *Client) UpdateDatabase(databaseId string, database Database) (*Database, error) {
-	rb, err := json.Marshal(database)
+func (c *Client) UpdateDatabase(databaseId string, input Database) (*Database, error) {
+	rb, err := json.Marshal(input)
 	if err != nil {
 		return nil, err
 	}
@@ -68,13 +68,13 @@ func (c *Client) UpdateDatabase(databaseId string, database Database) (*Database
 		return nil, err
 	}
 
-	newDatabase := Database{}
-	err = json.Unmarshal(body, &newDatabase)
+	database := Database{}
+	err = json.Unmarshal(body, &database)
 	if err != nil {
 		return nil, err
 	}
 
-	return &newDatabase, nil
+	return &database, nil
 }
 
 func (c *Client) DeleteDatabase(databaseId string) error {

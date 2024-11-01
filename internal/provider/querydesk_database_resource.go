@@ -31,16 +31,29 @@ func NewDatabaseResource() resource.Resource {
 
 // DatabaseResourceModel describes the resource data model.
 type databaseResourceModel struct {
-	Id             types.String `tfsdk:"id"`
-	Name           types.String `tfsdk:"name"`
-	Adapter        types.String `tfsdk:"adapter"`
-	Hostname       types.String `tfsdk:"hostname"`
-	Database       types.String `tfsdk:"database"`
-	Ssl            types.Bool   `tfsdk:"ssl"`
-	Cacertfile     types.String `tfsdk:"cacertfile"`
-	Keyfile        types.String `tfsdk:"keyfile"`
-	Certfile       types.String `tfsdk:"certfile"`
-	RestrictAccess types.Bool   `tfsdk:"restrict_access"`
+	Id                   types.String              `tfsdk:"id"`
+	Name                 types.String              `tfsdk:"name"`
+	Adapter              types.String              `tfsdk:"adapter"`
+	Hostname             types.String              `tfsdk:"hostname"`
+	Database             types.String              `tfsdk:"database"`
+	Ssl                  types.Bool                `tfsdk:"ssl"`
+	Cacertfile           types.String              `tfsdk:"cacertfile"`
+	Keyfile              types.String              `tfsdk:"keyfile"`
+	Certfile             types.String              `tfsdk:"certfile"`
+	RestrictAccess       types.Bool                `tfsdk:"restrict_access"`
+	Group                types.String              `tfsdk:"group"`
+	EnableDataProtection types.Bool                `tfsdk:"enable_data_protection"`
+	SlackWebhookURL      types.String              `tfsdk:"slack_webhook_url"`
+	SlackChannel         types.String              `tfsdk:"slack_channel"`
+	Credentials          []databaseCredentialModel `tfsdk:"credentials"`
+}
+
+type databaseCredentialModel struct {
+	Id                types.String `tfsdk:"id"`
+	Username          types.String `tfsdk:"username"`
+	Password          types.String `tfsdk:"password"`
+	ReviewsRequired   types.Int64  `tfsdk:"reviews_required"`
+	DefaultCredential types.Bool   `tfsdk:"default_credential"`
 }
 
 type databaseResource struct {
@@ -107,6 +120,57 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
 			},
+			"enable_data_protection": schema.BoolAttribute{
+				MarkdownDescription: "Whether to enable data protection for this database (only available on Enterprise plan).",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"group": schema.StringAttribute{
+				MarkdownDescription: "The group this database belongs to, used for UI grouping.",
+				Optional:            true,
+			},
+			"slack_webhook_url": schema.StringAttribute{
+				MarkdownDescription: "The slack webhook url to send query request notifications to.",
+				Optional:            true,
+			},
+			"slack_channel": schema.StringAttribute{
+				MarkdownDescription: "The slack channel to send query request notifications to.",
+				Optional:            true,
+			},
+			"credentials": schema.ListNestedAttribute{
+				Required: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: "Credential id.",
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
+						},
+						"username": schema.StringAttribute{
+							MarkdownDescription: "The username to use for connecting to the database.",
+							Required:            true,
+						},
+						"password": schema.StringAttribute{
+							MarkdownDescription: "The username to use for connecting to the database.",
+							Required:            true,
+							Sensitive:           true,
+						},
+						"reviews_required": schema.Int64Attribute{
+							MarkdownDescription: "The number of reviews required before a query can be executed.",
+							Required:            true,
+						},
+						"default_credential": schema.BoolAttribute{
+							MarkdownDescription: "Whether this is the default credential for the database.",
+							Optional:            true,
+							Computed:            true,
+							Default:             booldefault.StaticBool(false),
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -131,16 +195,31 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
+	var credentials []devhub.DatabaseCredential
+	for _, credential := range plan.Credentials {
+		credentials = append(credentials, devhub.DatabaseCredential{
+			Username:          credential.Username.ValueString(),
+			Password:          credential.Password.ValueString(),
+			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
+			DefaultCredential: credential.DefaultCredential.ValueBool(),
+		})
+	}
+
 	input := devhub.Database{
-		Name:           plan.Name.ValueString(),
-		Adapter:        adapter,
-		Hostname:       plan.Hostname.ValueString(),
-		Database:       plan.Database.ValueString(),
-		Ssl:            plan.Ssl.ValueBool(),
-		Cacertfile:     plan.Cacertfile.ValueString(),
-		Keyfile:        plan.Keyfile.ValueString(),
-		Certfile:       plan.Certfile.ValueString(),
-		RestrictAccess: plan.RestrictAccess.ValueBool(),
+		Name:                 plan.Name.ValueString(),
+		Adapter:              adapter,
+		Hostname:             plan.Hostname.ValueString(),
+		Database:             plan.Database.ValueString(),
+		Ssl:                  plan.Ssl.ValueBool(),
+		Cacertfile:           plan.Cacertfile.ValueString(),
+		Keyfile:              plan.Keyfile.ValueString(),
+		Certfile:             plan.Certfile.ValueString(),
+		RestrictAccess:       plan.RestrictAccess.ValueBool(),
+		EnableDataProtection: plan.EnableDataProtection.ValueBool(),
+		Group:                plan.Group.ValueString(),
+		SlackWebhookURL:      plan.SlackWebhookURL.ValueString(),
+		SlackChannel:         plan.SlackChannel.ValueString(),
+		Credentials:          credentials,
 	}
 
 	database, err := r.client.CreateDatabase(input)
@@ -154,6 +233,11 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	plan.Id = types.StringValue(database.Id)
+
+	for index, credential := range database.Credentials {
+		plan.Credentials[index].Id = types.StringValue(credential.Id)
+		plan.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
+	}
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -193,6 +277,19 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Database = types.StringValue(database.Database)
 	state.Ssl = types.BoolValue(database.Ssl)
 	state.RestrictAccess = types.BoolValue(database.RestrictAccess)
+	state.EnableDataProtection = types.BoolValue(database.EnableDataProtection)
+	state.SlackWebhookURL = types.StringValue(database.SlackWebhookURL)
+	state.SlackChannel = types.StringValue(database.SlackChannel)
+
+	for index, credential := range database.Credentials {
+		state.Credentials[index] = databaseCredentialModel{
+			Id:                types.StringValue(credential.Id),
+			Username:          types.StringValue(credential.Username),
+			Password:          state.Credentials[index].Password,
+			ReviewsRequired:   types.Int64Value(int64(credential.ReviewsRequired)),
+			DefaultCredential: types.BoolValue(credential.DefaultCredential),
+		}
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)

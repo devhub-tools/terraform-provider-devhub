@@ -18,6 +18,9 @@ func TestAccOrderResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", "my_database"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ssl", "false"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "restrict_access", "true"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.username", "postgres"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.password", "password"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.reviews_required", "0"),
 				),
 			},
 			// ImportState testing
@@ -25,6 +28,7 @@ func TestAccOrderResource(t *testing.T) {
 				ResourceName:      "devhub_querydesk_database.test",
 				ImportState:       true,
 				ImportStateVerify: true,
+				// ImportStateVerifyIgnore: []string{"credentials.password"},
 			},
 			// Update and Read testing
 			{
@@ -45,6 +49,20 @@ resource "devhub_querydesk_database" "test" {
   adapter  = "POSTGRES"
   hostname = "localhost"
   database = "mydb"
+
+	credentials = [
+		{
+			username 					 = "postgres"
+			password 				   = "password"
+			reviews_required 	 = 0
+			default_credential = true
+		},
+		{
+			username 				 = "another"
+			password 				 = "password2"
+			reviews_required = 1
+	}
+	]
 }
 `, name)
 }
