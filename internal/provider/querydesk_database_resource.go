@@ -278,17 +278,28 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Ssl = types.BoolValue(database.Ssl)
 	state.RestrictAccess = types.BoolValue(database.RestrictAccess)
 	state.EnableDataProtection = types.BoolValue(database.EnableDataProtection)
-	state.SlackWebhookURL = types.StringValue(database.SlackWebhookURL)
-	state.SlackChannel = types.StringValue(database.SlackChannel)
+
+	if database.SlackWebhookURL != "" {
+		state.SlackWebhookURL = types.StringValue(database.SlackWebhookURL)
+	} else {
+		state.SlackWebhookURL = types.StringNull()
+	}
+
+	if database.SlackChannel != "" {
+		state.SlackChannel = types.StringValue(database.SlackChannel)
+	} else {
+		state.SlackChannel = types.StringNull()
+	}
+
+	if state.Credentials == nil || len(state.Credentials) != len(database.Credentials) {
+		state.Credentials = make([]databaseCredentialModel, len(database.Credentials))
+	}
 
 	for index, credential := range database.Credentials {
-		state.Credentials[index] = databaseCredentialModel{
-			Id:                types.StringValue(credential.Id),
-			Username:          types.StringValue(credential.Username),
-			Password:          state.Credentials[index].Password,
-			ReviewsRequired:   types.Int64Value(int64(credential.ReviewsRequired)),
-			DefaultCredential: types.BoolValue(credential.DefaultCredential),
-		}
+		state.Credentials[index].Id = types.StringValue(credential.Id)
+		state.Credentials[index].Username = types.StringValue(credential.Username)
+		state.Credentials[index].ReviewsRequired = types.Int64Value(int64(credential.ReviewsRequired))
+		state.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
 	}
 
 	// Set refreshed state
@@ -319,16 +330,32 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
+	var credentials []devhub.DatabaseCredential
+	for _, credential := range plan.Credentials {
+		credentials = append(credentials, devhub.DatabaseCredential{
+			Id:                credential.Id.ValueString(),
+			Username:          credential.Username.ValueString(),
+			Password:          credential.Password.ValueString(),
+			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
+			DefaultCredential: credential.DefaultCredential.ValueBool(),
+		})
+	}
+
 	input := devhub.Database{
-		Name:           plan.Name.ValueString(),
-		Adapter:        adapter,
-		Hostname:       plan.Hostname.ValueString(),
-		Database:       plan.Database.ValueString(),
-		Ssl:            plan.Ssl.ValueBool(),
-		Cacertfile:     plan.Cacertfile.ValueString(),
-		Keyfile:        plan.Keyfile.ValueString(),
-		Certfile:       plan.Certfile.ValueString(),
-		RestrictAccess: plan.RestrictAccess.ValueBool(),
+		Name:                 plan.Name.ValueString(),
+		Adapter:              adapter,
+		Hostname:             plan.Hostname.ValueString(),
+		Database:             plan.Database.ValueString(),
+		Ssl:                  plan.Ssl.ValueBool(),
+		Cacertfile:           plan.Cacertfile.ValueString(),
+		Keyfile:              plan.Keyfile.ValueString(),
+		Certfile:             plan.Certfile.ValueString(),
+		RestrictAccess:       plan.RestrictAccess.ValueBool(),
+		EnableDataProtection: plan.EnableDataProtection.ValueBool(),
+		Group:                plan.Group.ValueString(),
+		SlackWebhookURL:      plan.SlackWebhookURL.ValueString(),
+		SlackChannel:         plan.SlackChannel.ValueString(),
+		Credentials:          credentials,
 	}
 
 	// Update existing order
