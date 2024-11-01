@@ -1,6 +1,7 @@
 package devhub
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,6 +50,10 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if res.StatusCode == http.StatusNotFound {
+		return nil, errors.New("not found")
 	}
 
 	if res.StatusCode != http.StatusOK {

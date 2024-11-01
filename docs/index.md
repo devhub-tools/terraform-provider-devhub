@@ -13,9 +13,9 @@ description: |-
 ## Example Usage
 
 ```terraform
-provider "querydesk" {
-  host    = "https://api.querydesk.com"
-  api_key = "SFMyNTY.g2gDbQAAAB5rZXl..."
+provider "devhub" {
+  host    = "https://api.devhub.sh"
+  api_key = "dh_b3JnXzAx..."
 }
 ```
 

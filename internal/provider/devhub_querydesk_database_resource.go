@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	devhub "terraform-provider-querydesk/internal/client"
+	devhub "terraform-provider-devhub/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -257,6 +257,12 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	database, err := r.client.GetDatabase(state.Id.ValueString())
+
+	if err.Error() == "not found" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Database",
@@ -264,12 +270,6 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 		)
 		return
 	}
-
-	// If id is empty, the resource no longer exists
-	// if graphqlResp.Database.Id == "" {
-	// 	resp.State.RemoveResource(ctx)
-	// 	return
-	// }
 
 	state.Name = types.StringValue(database.Name)
 	state.Adapter = types.StringValue(strings.ToUpper(database.Adapter))

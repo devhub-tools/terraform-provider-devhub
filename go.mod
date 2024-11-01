@@ -1,4 +1,4 @@
-module terraform-provider-querydesk
+module terraform-provider-devhub
 
 go 1.23
 

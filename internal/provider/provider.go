@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 	"os"
-	devhub "terraform-provider-querydesk/internal/client"
+	devhub "terraform-provider-devhub/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"

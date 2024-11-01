@@ -5,7 +5,7 @@ import (
 	"flag"
 	"log"
 
-	"terraform-provider-querydesk/internal/provider"
+	"terraform-provider-devhub/internal/provider"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
