@@ -1,12 +1,9 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package provider
 
 import (
 	"context"
 	"os"
-	"terraform-provider-querydesk/internal/client"
+	devhub "terraform-provider-devhub/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,67 +13,62 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// Ensure QueryDeskProvider satisfies various provider interfaces.
-var _ provider.Provider = &QueryDeskProvider{}
+var _ provider.Provider = &devhubProvider{}
 
-// QueryDeskProvider defines the provider implementation.
-type QueryDeskProvider struct {
-	// version is set to the provider version on release, "dev" when the
-	// provider is built and ran locally, and "test" when running acceptance
-	// testing.
-	version    string
-	testClient client.GraphQLClient
+func New(version string) func() provider.Provider {
+	return func() provider.Provider {
+		return &devhubProvider{
+			version: version,
+		}
+	}
 }
 
-// QueryDeskProviderModel describes the provider data model.
-type QueryDeskProviderModel struct {
+type devhubProviderModel struct {
 	Host   types.String `tfsdk:"host"`
 	ApiKey types.String `tfsdk:"api_key"`
 }
 
-func (p *QueryDeskProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "querydesk"
+type devhubProvider struct {
+	version string
+}
+
+func (p *devhubProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "devhub"
 	resp.Version = p.version
 }
 
-func (p *QueryDeskProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *devhubProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Required: true,
 			},
 			"api_key": schema.StringAttribute{
-				Required:  true,
-				Sensitive: true,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Alternatively, can be configured using the `DEVHUB_API_KEY` environment variable.",
 			},
 		},
 	}
 }
 
-func (p *QueryDeskProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data QueryDeskProviderModel
+func (p *devhubProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var config devhubProviderModel
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	diags := req.Config.Get(ctx, &config)
+
+	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if data.Host.IsUnknown() {
+	if config.Host.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("host"),
-			"Unknown QueryDesk API Host",
-			"The provider cannot create the QueryDesk API client as there is an unknown configuration value for the QueryDesk API host. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the QUERYDESK_HOST environment variable.",
-		)
-	}
-
-	if data.ApiKey.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("api_key"),
-			"Unknown QueryDesk API Key",
-			"The provider cannot create the QueryDesk API client as there is an unknown configuration value for the QueryDesk API key. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the QUERYDESK_API_KEY environment variable.",
+			"Unknown DevHub API Host",
+			"The provider cannot create the DevHub API client as there is an unknown configuration value for the DevHub API host. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the DEVHUB_HOST environment variable.",
 		)
 	}
 
@@ -84,23 +76,23 @@ func (p *QueryDeskProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	host := os.Getenv("QUERYDESK_HOST")
-	api_key := os.Getenv("QUERYDESK_API_KEY")
+	host := os.Getenv("DEVHUB_HOST")
+	api_key := os.Getenv("DEVHUB_API_KEY")
 
-	if !data.Host.IsNull() {
-		host = data.Host.ValueString()
+	if host == "" {
+		host = config.Host.ValueString()
 	}
 
-	if !data.ApiKey.IsNull() {
-		api_key = data.ApiKey.ValueString()
+	if api_key == "" {
+		api_key = config.ApiKey.ValueString()
 	}
 
 	if api_key == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("api_key"),
-			"Missing QueryDesk API Key",
-			"The provider cannot create the QueryDesk API client as there is a missing or empty value for the QueryDesk API key. "+
-				"Set the api key value in the configuration or use the QUERYDESK_API_KEY environment variable. "+
+			"Missing DevHub API Key",
+			"The provider cannot create the DevHub API client as there is a missing or empty value for the DevHub API key. "+
+				"Set the api key value in the configuration or use the DEVHUB_API_KEY environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
@@ -109,45 +101,27 @@ func (p *QueryDeskProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	graphqlClient, err := client.NewClient(&host, &api_key)
+	client, err := devhub.NewClient(&host, &api_key)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to Create QueryDesk API Client",
-			"An unexpected error occurred when creating the QueryDesk API client. "+
+			"Unable to Create DevHub API Client",
+			"An unexpected error occurred when creating the DevHub API client. "+
 				"If the error is not clear, please contact the provider developers.\n\n"+
-				"QueryDesk Client Error: "+err.Error(),
+				"DevHub Client Error: "+err.Error(),
 		)
 		return
 	}
 
-	var myclient client.GraphQLClient
-
-	myclient = client.GraphQLReq{Client: *graphqlClient}
-
-	if p.testClient != nil {
-		myclient = p.testClient
-	}
-
-	resp.DataSourceData = myclient
-	resp.ResourceData = myclient
+	resp.DataSourceData = client
+	resp.ResourceData = client
 }
 
-func (p *QueryDeskProvider) Resources(ctx context.Context) []func() resource.Resource {
+func (p *devhubProvider) DataSources(_ context.Context) []func() datasource.DataSource {
+	return nil
+}
+
+func (p *devhubProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewDatabaseResource,
-		NewDatabaseUserResource,
-	}
-}
-
-func (p *QueryDeskProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
-}
-
-func New(version string, client client.GraphQLClient) func() provider.Provider {
-	return func() provider.Provider {
-		return &QueryDeskProvider{
-			version:    version,
-			testClient: client,
-		}
 	}
 }
