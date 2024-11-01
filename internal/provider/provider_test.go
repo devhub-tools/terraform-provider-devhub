@@ -12,7 +12,7 @@ const (
 	providerConfig = `
 provider "devhub" {
 	host    = "http://localhost:4000"
-	api_key = "dh_b3JnXzAxSjIyR0M5NUpRS0JGRzI0WE5LQjRNQjUyOr0dxLoeRj8hSUvpCViuHdEHXM-hid12JKckd_4DWFv1"
+	api_key = "test"
 }
 `
 )

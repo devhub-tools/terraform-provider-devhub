@@ -44,8 +44,9 @@ func (p *devhubProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Required: true,
 			},
 			"api_key": schema.StringAttribute{
-				Required:  true,
-				Sensitive: true,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Alternatively, can be configured using the `DEVHUB_API_KEY` environment variable.",
 			},
 		},
 	}
@@ -71,15 +72,6 @@ func (p *devhubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		)
 	}
 
-	if config.ApiKey.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("api_key"),
-			"Unknown DevHub API Key",
-			"The provider cannot create the DevHub API client as there is an unknown configuration value for the DevHub API key. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the DEVHUB_API_KEY environment variable.",
-		)
-	}
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -87,11 +79,11 @@ func (p *devhubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	host := os.Getenv("DEVHUB_HOST")
 	api_key := os.Getenv("DEVHUB_API_KEY")
 
-	if !config.Host.IsNull() {
+	if host == "" {
 		host = config.Host.ValueString()
 	}
 
-	if !config.ApiKey.IsNull() {
+	if api_key == "" {
 		api_key = config.ApiKey.ValueString()
 	}
 

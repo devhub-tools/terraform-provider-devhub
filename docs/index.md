@@ -24,5 +24,8 @@ provider "devhub" {
 
 ### Required
 
-- `api_key` (String, Sensitive)
 - `host` (String)
+
+### Optional
+
+- `api_key` (String, Sensitive) Alternatively, can be configured using the `DEVHUB_API_KEY` environment variable.

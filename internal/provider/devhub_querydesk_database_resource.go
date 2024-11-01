@@ -258,7 +258,7 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	database, err := r.client.GetDatabase(state.Id.ValueString())
 
-	if err.Error() == "not found" {
+	if err != nil && err.Error() == "not found" {
 		resp.State.RemoveResource(ctx)
 		return
 	}
