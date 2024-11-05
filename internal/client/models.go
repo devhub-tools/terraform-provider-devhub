@@ -15,6 +15,7 @@ type Database struct {
 	Group                string               `json:"group"`
 	SlackWebhookURL      string               `json:"slack_webhook_url"`
 	SlackChannel         string               `json:"slack_channel"`
+	AgentId              string               `json:"agent_id"`
 	Credentials          []DatabaseCredential `json:"credentials"`
 }
 

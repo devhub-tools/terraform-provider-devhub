@@ -45,6 +45,7 @@ type databaseResourceModel struct {
 	EnableDataProtection types.Bool                `tfsdk:"enable_data_protection"`
 	SlackWebhookURL      types.String              `tfsdk:"slack_webhook_url"`
 	SlackChannel         types.String              `tfsdk:"slack_channel"`
+	AgentId              types.String              `tfsdk:"agent_id"`
 	Credentials          []databaseCredentialModel `tfsdk:"credentials"`
 }
 
@@ -138,6 +139,10 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				MarkdownDescription: "The slack channel to send query request notifications to.",
 				Optional:            true,
 			},
+			"agent_id": schema.StringAttribute{
+				MarkdownDescription: "The agent id for the database.",
+				Optional:            true,
+			},
 			"credentials": schema.ListNestedAttribute{
 				Required: true,
 				NestedObject: schema.NestedAttributeObject{
@@ -219,6 +224,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		Group:                plan.Group.ValueString(),
 		SlackWebhookURL:      plan.SlackWebhookURL.ValueString(),
 		SlackChannel:         plan.SlackChannel.ValueString(),
+		AgentId:              plan.AgentId.ValueString(),
 		Credentials:          credentials,
 	}
 
@@ -291,6 +297,12 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.SlackChannel = types.StringNull()
 	}
 
+	if database.AgentId != "" {
+		state.AgentId = types.StringValue(database.AgentId)
+	} else {
+		state.AgentId = types.StringNull()
+	}
+
 	if state.Credentials == nil || len(state.Credentials) != len(database.Credentials) {
 		state.Credentials = make([]databaseCredentialModel, len(database.Credentials))
 	}
@@ -355,6 +367,7 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		Group:                plan.Group.ValueString(),
 		SlackWebhookURL:      plan.SlackWebhookURL.ValueString(),
 		SlackChannel:         plan.SlackChannel.ValueString(),
+		AgentId:              plan.AgentId.ValueString(),
 		Credentials:          credentials,
 	}
 
