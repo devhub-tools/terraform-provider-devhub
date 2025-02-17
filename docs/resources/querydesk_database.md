@@ -51,7 +51,6 @@ resource "devhub_querydesk_database" "example" {
 - `keyfile` (String, Sensitive) The client key to use with ssl connections, `ssl` must be set to `true`.
 - `restrict_access` (Boolean) Whether access to this databases should be explicitly granted to users or if any authenticated user can access it.
 - `slack_channel` (String) The slack channel to send query request notifications to.
-- `slack_webhook_url` (String) The slack webhook url to send query request notifications to.
 - `ssl` (Boolean) Set to `true` to turn on ssl connections for this database.
 
 ### Read-Only

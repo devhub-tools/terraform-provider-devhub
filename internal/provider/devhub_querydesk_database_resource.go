@@ -25,7 +25,7 @@ var (
 	_ resource.ResourceWithImportState = &databaseResource{}
 )
 
-func NewDatabaseResource() resource.Resource {
+func DatabaseResource() resource.Resource {
 	return &databaseResource{}
 }
 
@@ -43,7 +43,6 @@ type databaseResourceModel struct {
 	RestrictAccess       types.Bool                `tfsdk:"restrict_access"`
 	Group                types.String              `tfsdk:"group"`
 	EnableDataProtection types.Bool                `tfsdk:"enable_data_protection"`
-	SlackWebhookURL      types.String              `tfsdk:"slack_webhook_url"`
 	SlackChannel         types.String              `tfsdk:"slack_channel"`
 	AgentId              types.String              `tfsdk:"agent_id"`
 	Credentials          []databaseCredentialModel `tfsdk:"credentials"`
@@ -129,10 +128,6 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"group": schema.StringAttribute{
 				MarkdownDescription: "The group this database belongs to, used for UI grouping.",
-				Optional:            true,
-			},
-			"slack_webhook_url": schema.StringAttribute{
-				MarkdownDescription: "The slack webhook url to send query request notifications to.",
 				Optional:            true,
 			},
 			"slack_channel": schema.StringAttribute{
@@ -222,7 +217,6 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		RestrictAccess:       plan.RestrictAccess.ValueBool(),
 		EnableDataProtection: plan.EnableDataProtection.ValueBool(),
 		Group:                plan.Group.ValueString(),
-		SlackWebhookURL:      plan.SlackWebhookURL.ValueString(),
 		SlackChannel:         plan.SlackChannel.ValueString(),
 		AgentId:              plan.AgentId.ValueString(),
 		Credentials:          credentials,
@@ -284,12 +278,6 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Ssl = types.BoolValue(database.Ssl)
 	state.RestrictAccess = types.BoolValue(database.RestrictAccess)
 	state.EnableDataProtection = types.BoolValue(database.EnableDataProtection)
-
-	if database.SlackWebhookURL != "" {
-		state.SlackWebhookURL = types.StringValue(database.SlackWebhookURL)
-	} else {
-		state.SlackWebhookURL = types.StringNull()
-	}
 
 	if database.SlackChannel != "" {
 		state.SlackChannel = types.StringValue(database.SlackChannel)
@@ -365,7 +353,6 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		RestrictAccess:       plan.RestrictAccess.ValueBool(),
 		EnableDataProtection: plan.EnableDataProtection.ValueBool(),
 		Group:                plan.Group.ValueString(),
-		SlackWebhookURL:      plan.SlackWebhookURL.ValueString(),
 		SlackChannel:         plan.SlackChannel.ValueString(),
 		AgentId:              plan.AgentId.ValueString(),
 		Credentials:          credentials,
