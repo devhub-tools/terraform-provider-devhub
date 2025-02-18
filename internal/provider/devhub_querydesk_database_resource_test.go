@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestAccOrderResource(t *testing.T) {
+func TestAccDatabaseResource(t *testing.T) {
+	name := fmt.Sprintf("database_%s", acctest.RandString(10))
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccDatabaseResourceConfig("my_database"),
+				Config: testAccDatabaseResourceConfig(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", "my_database"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "adapter", "POSTGRES"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "hostname", "localhost"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ssl", "false"),
@@ -40,10 +42,9 @@ func TestAccOrderResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseResourceConfig("another_database"),
+				Config: testAccDatabaseResourceConfig(name + "_updated"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", "another_database"),
-					// everything else should be the same
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name+"_updated"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "adapter", "POSTGRES"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "hostname", "localhost"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ssl", "false"),

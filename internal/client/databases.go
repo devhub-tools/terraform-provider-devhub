@@ -8,7 +8,7 @@ import (
 )
 
 func (c *Client) GetDatabase(databaseId string) (*Database, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/querydesk/v1/databases/%s", c.HostURL, databaseId), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/querydesk/databases/%s", c.HostURL, databaseId), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (c *Client) CreateDatabase(input Database) (*Database, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/querydesk/v1/databases", c.HostURL), strings.NewReader(string(rb)))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/querydesk/databases", c.HostURL), strings.NewReader(string(rb)))
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (c *Client) UpdateDatabase(databaseId string, input Database) (*Database, e
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/querydesk/v1/databases/%s", c.HostURL, databaseId), strings.NewReader(string(rb)))
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/api/v1/querydesk/databases/%s", c.HostURL, databaseId), strings.NewReader(string(rb)))
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (c *Client) UpdateDatabase(databaseId string, input Database) (*Database, e
 }
 
 func (c *Client) DeleteDatabase(databaseId string) error {
-	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/querydesk/v1/databases/%s", c.HostURL, databaseId), nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/v1/querydesk/databases/%s", c.HostURL, databaseId), nil)
 	if err != nil {
 		return err
 	}
