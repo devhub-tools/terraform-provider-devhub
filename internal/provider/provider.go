@@ -66,8 +66,8 @@ func (p *devhubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if config.Host.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("host"),
-			"Unknown DevHub API Host",
-			"The provider cannot create the DevHub API client as there is an unknown configuration value for the DevHub API host. "+
+			"Unknown Devhub API Host",
+			"The provider cannot create the Devhub API client as there is an unknown configuration value for the Devhub API host. "+
 				"Either target apply the source of the value first, set the value statically in the configuration, or use the DEVHUB_HOST environment variable.",
 		)
 	}
@@ -90,8 +90,8 @@ func (p *devhubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if api_key == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("api_key"),
-			"Missing DevHub API Key",
-			"The provider cannot create the DevHub API client as there is a missing or empty value for the DevHub API key. "+
+			"Missing Devhub API Key",
+			"The provider cannot create the Devhub API client as there is a missing or empty value for the Devhub API key. "+
 				"Set the api key value in the configuration or use the DEVHUB_API_KEY environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
@@ -104,10 +104,10 @@ func (p *devhubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	client, err := devhub.NewClient(&host, &api_key)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to Create DevHub API Client",
-			"An unexpected error occurred when creating the DevHub API client. "+
+			"Unable to Create Devhub API Client",
+			"An unexpected error occurred when creating the Devhub API client. "+
 				"If the error is not clear, please contact the provider developers.\n\n"+
-				"DevHub Client Error: "+err.Error(),
+				"Devhub Client Error: "+err.Error(),
 		)
 		return
 	}
@@ -122,6 +122,7 @@ func (p *devhubProvider) DataSources(_ context.Context) []func() datasource.Data
 
 func (p *devhubProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewDatabaseResource,
+		DatabaseResource,
+		TerradeskWorkspaceResource,
 	}
 }

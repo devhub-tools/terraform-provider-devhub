@@ -61,6 +61,7 @@ jobs:
           - '1.7.*'
           - '1.8.*'
           - '1.9.*'
+          - '1.10.*'
 
     steps:
       - uses: actions/checkout@v4
@@ -79,7 +80,7 @@ jobs:
 
       - env:
           TF_ACC: "1"
-          DEVHUB_HOST: https://api.devhub.tools
+          DEVHUB_HOST: https://private.devhub.tools
           DEVHUB_API_KEY: ${{ secrets.DEVHUB_API_KEY }}
         run: go test -v -cover ./...
         timeout-minutes: 10
