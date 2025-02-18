@@ -27,20 +27,20 @@ type DatabaseCredential struct {
 }
 
 type TerradeskWorkspace struct {
-	Id                    string           `json:"id"`
-	Name                  string           `json:"name"`
-	Repository            string           `json:"repository"`
-	InitArgs              string           `json:"init_args"`
-	Path                  string           `json:"path"`
-	RunPlansAutomatically bool             `json:"run_plans_automatically"`
-	RequiredApprovals     int              `json:"required_approvals"`
-	DockerImage           string           `json:"docker_image"`
-	CpuRequests           string           `json:"cpu_requests"`
-	MemoryRequests        string           `json:"memory_requests"`
-	AgentId               string           `json:"agent_id"`
-	WorkloadIdentity      WorkloadIdentity `json:"workload_identity"`
-	EnvVars               []EnvVar         `json:"env_vars"`
-	Secrets               []Secret         `json:"secrets"`
+	Id                    string            `json:"id"`
+	Name                  string            `json:"name"`
+	Repository            string            `json:"repository"`
+	InitArgs              string            `json:"init_args"`
+	Path                  string            `json:"path"`
+	RunPlansAutomatically bool              `json:"run_plans_automatically"`
+	RequiredApprovals     int               `json:"required_approvals"`
+	DockerImage           string            `json:"docker_image"`
+	CpuRequests           string            `json:"cpu_requests"`
+	MemoryRequests        string            `json:"memory_requests"`
+	AgentId               string            `json:"agent_id"`
+	WorkloadIdentity      *WorkloadIdentity `json:"workload_identity"`
+	EnvVars               []EnvVar          `json:"env_vars"`
+	Secrets               []Secret          `json:"secrets"`
 }
 
 type WorkloadIdentity struct {

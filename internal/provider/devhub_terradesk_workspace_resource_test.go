@@ -13,22 +13,16 @@ func TestAccWorkspaceResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccWorkspaceResourceConfig("my_database"),
+				Config: testAccWorkspaceResourceConfig("my_workspace"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_database"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "adapter", "POSTGRES"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "hostname", "localhost"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "ssl", "false"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "restrict_access", "true"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "enable_data_protection", "false"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.0.username", "postgres"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.0.password", "password"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.0.reviews_required", "0"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.0.default_credential", "true"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.1.username", "another"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.1.password", "password2"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.1.reviews_required", "1"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.1.default_credential", "false"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_workspace"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "repository", "devhub-tools/devhub"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "path", "terraform"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "docker_image", "hashicorp/terraform:1.10"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "env_vars.0.name", "ENV_VAR"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "env_vars.0.value", "env-var-value"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "secrets.0.name", "my_secret"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "secrets.0.value", "secret-value"),
 				),
 			},
 			// ImportState testing
@@ -36,27 +30,21 @@ func TestAccWorkspaceResource(t *testing.T) {
 				ResourceName:            "devhub_terradesk_workspace.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"credentials.0.password", "credentials.1.password"},
+				ImportStateVerifyIgnore: []string{"secrets.0.value"},
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseResourceConfig("another_database"),
+				Config: testAccWorkspaceResourceConfig("another_workspace"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "another_database"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "another_workspace"),
 					// everything else should be the same
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "adapter", "POSTGRES"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "hostname", "localhost"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "ssl", "false"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "restrict_access", "true"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "enable_data_protection", "false"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.0.username", "postgres"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.0.password", "password"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.0.reviews_required", "0"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.0.default_credential", "true"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.1.username", "another"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.1.password", "password2"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.1.reviews_required", "1"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "credentials.1.default_credential", "false"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "repository", "devhub-tools/devhub"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "path", "terraform"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "docker_image", "hashicorp/terraform:1.10"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "env_vars.0.name", "ENV_VAR"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "env_vars.0.value", "env-var-value"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "secrets.0.name", "my_secret"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "secrets.0.value", "secret-value"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -87,4 +75,57 @@ resource "devhub_terradesk_workspace" "test" {
 	]
 }
 `, name)
+}
+
+func TestAccWorkspaceWithWorkloadIdentityResource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: testAccWorkspaceWithWorkloadIdentityResourceConfig("devhub@google.com"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_workspace"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.enabled", "true"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.service_account_email", "devhub@google.com"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "iam.googleapis.com"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "devhub_terradesk_workspace.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"secrets.0.value"},
+			},
+			// Update and Read testing
+			{
+				Config: testAccWorkspaceWithWorkloadIdentityResourceConfig("serviceaccount@google.com"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_workspace"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.enabled", "true"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.service_account_email", "serviceaccount@google.com"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "iam.googleapis.com"),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func testAccWorkspaceWithWorkloadIdentityResourceConfig(email string) string {
+	return providerConfig + fmt.Sprintf(`
+resource "devhub_terradesk_workspace" "test" {
+  name     		 = "my_workspace"
+  repository   = "devhub-tools/devhub"
+	path 				 = "terraform"
+	docker_image = "hashicorp/terraform:1.10"
+
+	workload_identity = {
+		enabled             = true
+		service_account_email = %[1]q
+		provider            = "iam.googleapis.com"
+	}
+}
+`, email)
 }

@@ -28,6 +28,14 @@ func (c *Client) GetWorkspace(workspaceId string) (*TerradeskWorkspace, error) {
 }
 
 func (c *Client) CreateWorkspace(input TerradeskWorkspace) (*TerradeskWorkspace, error) {
+	if input.EnvVars == nil {
+		input.EnvVars = make([]EnvVar, 0)
+	}
+
+	if input.Secrets == nil {
+		input.Secrets = make([]Secret, 0)
+	}
+
 	rb, err := json.Marshal(input)
 	if err != nil {
 		return nil, err
@@ -53,6 +61,14 @@ func (c *Client) CreateWorkspace(input TerradeskWorkspace) (*TerradeskWorkspace,
 }
 
 func (c *Client) UpdateWorkspace(workspaceId string, input TerradeskWorkspace) (*TerradeskWorkspace, error) {
+	if input.EnvVars == nil {
+		input.EnvVars = make([]EnvVar, 0)
+	}
+
+	if input.Secrets == nil {
+		input.Secrets = make([]Secret, 0)
+	}
+
 	rb, err := json.Marshal(input)
 	if err != nil {
 		return nil, err

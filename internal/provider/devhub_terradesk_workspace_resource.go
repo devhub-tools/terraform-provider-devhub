@@ -8,11 +8,13 @@ import (
 	"fmt"
 	devhub "terraform-provider-devhub/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -32,20 +34,20 @@ func TerradeskWorkspaceResource() resource.Resource {
 
 // TerradeskWorkspaceResourceModel describes the resource data model.
 type terradeskWorkspaceResourceModel struct {
-	Id                    types.String          `tfsdk:"id"`
-	Name                  types.String          `tfsdk:"name"`
-	Repository            types.String          `tfsdk:"repository"`
-	InitArgs              types.String          `tfsdk:"init_args"`
-	Path                  types.String          `tfsdk:"path"`
-	RunPlansAutomatically types.Bool            `tfsdk:"run_plans_automatically"`
-	RequiredApprovals     types.Int64           `tfsdk:"required_approvals"`
-	DockerImage           types.String          `tfsdk:"docker_image"`
-	CpuRequests           types.String          `tfsdk:"cpu_requests"`
-	MemoryRequests        types.String          `tfsdk:"memory_requests"`
-	AgentId               types.String          `tfsdk:"agent_id"`
-	WorkloadIdentity      workloadIdentityModel `tfsdk:"workload_identity"`
-	EnvVars               []envVarModel         `tfsdk:"env_vars"`
-	Secrets               []secretModel         `tfsdk:"secrets"`
+	Id                    types.String           `tfsdk:"id"`
+	Name                  types.String           `tfsdk:"name"`
+	Repository            types.String           `tfsdk:"repository"`
+	InitArgs              types.String           `tfsdk:"init_args"`
+	Path                  types.String           `tfsdk:"path"`
+	RunPlansAutomatically types.Bool             `tfsdk:"run_plans_automatically"`
+	RequiredApprovals     types.Int64            `tfsdk:"required_approvals"`
+	DockerImage           types.String           `tfsdk:"docker_image"`
+	CpuRequests           types.String           `tfsdk:"cpu_requests"`
+	MemoryRequests        types.String           `tfsdk:"memory_requests"`
+	AgentId               types.String           `tfsdk:"agent_id"`
+	WorkloadIdentity      *workloadIdentityModel `tfsdk:"workload_identity"`
+	EnvVars               []envVarModel          `tfsdk:"env_vars"`
+	Secrets               []secretModel          `tfsdk:"secrets"`
 }
 
 type workloadIdentityModel struct {
@@ -155,7 +157,20 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"env_vars": schema.ListNestedAttribute{
-				Required: true,
+				Optional: true,
+				Computed: true,
+				Default: listdefault.StaticValue(
+					types.ListValueMust(
+						types.ObjectType{
+							AttrTypes: map[string]attr.Type{
+								"id":    types.StringType,
+								"name":  types.StringType,
+								"value": types.StringType,
+							},
+						},
+						[]attr.Value{},
+					),
+				),
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -177,7 +192,20 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"secrets": schema.ListNestedAttribute{
-				Required: true,
+				Optional: true,
+				Computed: true,
+				Default: listdefault.StaticValue(
+					types.ListValueMust(
+						types.ObjectType{
+							AttrTypes: map[string]attr.Type{
+								"id":    types.StringType,
+								"name":  types.StringType,
+								"value": types.StringType,
+							},
+						},
+						[]attr.Value{},
+					),
+				),
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -239,13 +267,16 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 		CpuRequests:           plan.CpuRequests.ValueString(),
 		MemoryRequests:        plan.MemoryRequests.ValueString(),
 		AgentId:               plan.AgentId.ValueString(),
-		WorkloadIdentity: devhub.WorkloadIdentity{
+		EnvVars:               envVars,
+		Secrets:               secrets,
+	}
+
+	if plan.WorkloadIdentity != nil {
+		input.WorkloadIdentity = &devhub.WorkloadIdentity{
 			Enabled:             plan.WorkloadIdentity.Enabled.ValueBool(),
 			ServiceAccountEmail: plan.WorkloadIdentity.ServiceAccountEmail.ValueString(),
 			Provider:            plan.WorkloadIdentity.Provider.ValueString(),
-		},
-		EnvVars: envVars,
-		Secrets: secrets,
+		}
 	}
 
 	workspace, err := r.client.CreateWorkspace(input)
@@ -302,17 +333,30 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 
 	state.Name = types.StringValue(workspace.Name)
 	state.Repository = types.StringValue(workspace.Repository)
-	state.InitArgs = types.StringValue(workspace.InitArgs)
-	state.Path = types.StringValue(workspace.Path)
+
+	if workspace.InitArgs != "" {
+		state.InitArgs = types.StringValue(workspace.InitArgs)
+	}
+
+	if workspace.Path != "" {
+		state.Path = types.StringValue(workspace.Path)
+	}
+
 	state.RunPlansAutomatically = types.BoolValue(workspace.RunPlansAutomatically)
 	state.RequiredApprovals = types.Int64Value(int64(workspace.RequiredApprovals))
 	state.DockerImage = types.StringValue(workspace.DockerImage)
 	state.CpuRequests = types.StringValue(workspace.CpuRequests)
 	state.MemoryRequests = types.StringValue(workspace.MemoryRequests)
 
-	state.WorkloadIdentity.Enabled = types.BoolValue(workspace.WorkloadIdentity.Enabled)
-	state.WorkloadIdentity.ServiceAccountEmail = types.StringValue(workspace.WorkloadIdentity.ServiceAccountEmail)
-	state.WorkloadIdentity.Provider = types.StringValue(workspace.WorkloadIdentity.Provider)
+	if workspace.WorkloadIdentity == nil {
+		state.WorkloadIdentity = nil
+	} else {
+		state.WorkloadIdentity = &workloadIdentityModel{
+			Enabled:             types.BoolValue(workspace.WorkloadIdentity.Enabled),
+			ServiceAccountEmail: types.StringValue(workspace.WorkloadIdentity.ServiceAccountEmail),
+			Provider:            types.StringValue(workspace.WorkloadIdentity.Provider),
+		}
+	}
 
 	if workspace.AgentId != "" {
 		state.AgentId = types.StringValue(workspace.AgentId)
@@ -385,16 +429,18 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 		CpuRequests:           plan.CpuRequests.ValueString(),
 		MemoryRequests:        plan.MemoryRequests.ValueString(),
 		AgentId:               plan.AgentId.ValueString(),
-		WorkloadIdentity: devhub.WorkloadIdentity{
+		EnvVars:               envVars,
+		Secrets:               secrets,
+	}
+
+	if plan.WorkloadIdentity != nil {
+		input.WorkloadIdentity = &devhub.WorkloadIdentity{
 			Enabled:             plan.WorkloadIdentity.Enabled.ValueBool(),
 			ServiceAccountEmail: plan.WorkloadIdentity.ServiceAccountEmail.ValueString(),
 			Provider:            plan.WorkloadIdentity.Provider.ValueString(),
-		},
-		EnvVars: envVars,
-		Secrets: secrets,
+		}
 	}
 
-	// Update existing order
 	_, err := r.client.UpdateWorkspace(plan.Id.ValueString(), input)
 	if err != nil {
 		resp.Diagnostics.AddError(
