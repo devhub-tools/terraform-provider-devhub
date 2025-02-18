@@ -88,7 +88,7 @@ func TestAccWorkspaceWithWorkloadIdentityResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_workspace"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.enabled", "true"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.service_account_email", "devhub@google.com"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "iam.googleapis.com"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "projects/123456789/locations/global/workloadIdentityPools/pools/devhub/providers/devhub"),
 				),
 			},
 			// ImportState testing
@@ -105,7 +105,7 @@ func TestAccWorkspaceWithWorkloadIdentityResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_workspace"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.enabled", "true"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.service_account_email", "serviceaccount@google.com"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "iam.googleapis.com"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "projects/123456789/locations/global/workloadIdentityPools/pools/devhub/providers/devhub"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -124,7 +124,7 @@ resource "devhub_terradesk_workspace" "test" {
 	workload_identity = {
 		enabled             = true
 		service_account_email = %[1]q
-		provider            = "iam.googleapis.com"
+		provider            = "projects/123456789/locations/global/workloadIdentityPools/pools/devhub/providers/devhub"
 	}
 }
 `, email)

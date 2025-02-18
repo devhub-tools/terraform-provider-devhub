@@ -151,7 +151,7 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 						Optional:            true,
 					},
 					"provider": schema.StringAttribute{
-						MarkdownDescription: "The workload identity provider to use: `iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL}/providers/${PROVIDER}`",
+						MarkdownDescription: "The workload identity provider to use: `projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL}/providers/${PROVIDER}`",
 						Optional:            true,
 					},
 				},
