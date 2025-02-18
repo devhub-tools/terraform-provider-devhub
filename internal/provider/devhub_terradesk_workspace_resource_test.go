@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccWorkspaceResource(t *testing.T) {
+	name := fmt.Sprintf("workspace_%s", acctest.RandString(10))
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccWorkspaceResourceConfig("my_workspace"),
+				Config: testAccWorkspaceResourceConfig(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_workspace"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", name),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "repository", "devhub-tools/devhub"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "path", "terraform"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "docker_image", "hashicorp/terraform:1.10"),
@@ -34,9 +36,9 @@ func TestAccWorkspaceResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: testAccWorkspaceResourceConfig("another_workspace"),
+				Config: testAccWorkspaceResourceConfig(name + "_updated"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "another_workspace"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", name+"_updated"),
 					// everything else should be the same
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "repository", "devhub-tools/devhub"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "path", "terraform"),
