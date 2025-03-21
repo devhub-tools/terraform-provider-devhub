@@ -1,21 +1,20 @@
 package devhub
 
 type Database struct {
-	Id                   string               `json:"id"`
-	Name                 string               `json:"name"`
-	Adapter              string               `json:"adapter"`
-	Hostname             string               `json:"hostname"`
-	Database             string               `json:"database"`
-	Ssl                  bool                 `json:"ssl"`
-	Cacertfile           string               `json:"cacertfile"`
-	Keyfile              string               `json:"keyfile"`
-	Certfile             string               `json:"certfile"`
-	RestrictAccess       bool                 `json:"restrict_access"`
-	EnableDataProtection bool                 `json:"enable_data_protection"`
-	Group                string               `json:"group"`
-	SlackChannel         string               `json:"slack_channel"`
-	AgentId              string               `json:"agent_id"`
-	Credentials          []DatabaseCredential `json:"credentials"`
+	Id             string               `json:"id"`
+	Name           string               `json:"name"`
+	Adapter        string               `json:"adapter"`
+	Hostname       string               `json:"hostname"`
+	Database       string               `json:"database"`
+	Ssl            bool                 `json:"ssl"`
+	Cacertfile     string               `json:"cacertfile"`
+	Keyfile        string               `json:"keyfile"`
+	Certfile       string               `json:"certfile"`
+	RestrictAccess bool                 `json:"restrict_access"`
+	Group          string               `json:"group"`
+	SlackChannel   string               `json:"slack_channel"`
+	AgentId        string               `json:"agent_id"`
+	Credentials    []DatabaseCredential `json:"credentials"`
 }
 
 type DatabaseCredential struct {
