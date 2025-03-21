@@ -31,21 +31,20 @@ func DatabaseResource() resource.Resource {
 
 // DatabaseResourceModel describes the resource data model.
 type databaseResourceModel struct {
-	Id                   types.String              `tfsdk:"id"`
-	Name                 types.String              `tfsdk:"name"`
-	Adapter              types.String              `tfsdk:"adapter"`
-	Hostname             types.String              `tfsdk:"hostname"`
-	Database             types.String              `tfsdk:"database"`
-	Ssl                  types.Bool                `tfsdk:"ssl"`
-	Cacertfile           types.String              `tfsdk:"cacertfile"`
-	Keyfile              types.String              `tfsdk:"keyfile"`
-	Certfile             types.String              `tfsdk:"certfile"`
-	RestrictAccess       types.Bool                `tfsdk:"restrict_access"`
-	Group                types.String              `tfsdk:"group"`
-	EnableDataProtection types.Bool                `tfsdk:"enable_data_protection"`
-	SlackChannel         types.String              `tfsdk:"slack_channel"`
-	AgentId              types.String              `tfsdk:"agent_id"`
-	Credentials          []databaseCredentialModel `tfsdk:"credentials"`
+	Id             types.String              `tfsdk:"id"`
+	Name           types.String              `tfsdk:"name"`
+	Adapter        types.String              `tfsdk:"adapter"`
+	Hostname       types.String              `tfsdk:"hostname"`
+	Database       types.String              `tfsdk:"database"`
+	Ssl            types.Bool                `tfsdk:"ssl"`
+	Cacertfile     types.String              `tfsdk:"cacertfile"`
+	Keyfile        types.String              `tfsdk:"keyfile"`
+	Certfile       types.String              `tfsdk:"certfile"`
+	RestrictAccess types.Bool                `tfsdk:"restrict_access"`
+	Group          types.String              `tfsdk:"group"`
+	SlackChannel   types.String              `tfsdk:"slack_channel"`
+	AgentId        types.String              `tfsdk:"agent_id"`
+	Credentials    []databaseCredentialModel `tfsdk:"credentials"`
 }
 
 type databaseCredentialModel struct {
@@ -119,12 +118,6 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
-			},
-			"enable_data_protection": schema.BoolAttribute{
-				MarkdownDescription: "Whether to enable data protection for this database (only available on Enterprise plan).",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
 			},
 			"group": schema.StringAttribute{
 				MarkdownDescription: "The group this database belongs to, used for UI grouping.",
@@ -206,20 +199,19 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	input := devhub.Database{
-		Name:                 plan.Name.ValueString(),
-		Adapter:              adapter,
-		Hostname:             plan.Hostname.ValueString(),
-		Database:             plan.Database.ValueString(),
-		Ssl:                  plan.Ssl.ValueBool(),
-		Cacertfile:           plan.Cacertfile.ValueString(),
-		Keyfile:              plan.Keyfile.ValueString(),
-		Certfile:             plan.Certfile.ValueString(),
-		RestrictAccess:       plan.RestrictAccess.ValueBool(),
-		EnableDataProtection: plan.EnableDataProtection.ValueBool(),
-		Group:                plan.Group.ValueString(),
-		SlackChannel:         plan.SlackChannel.ValueString(),
-		AgentId:              plan.AgentId.ValueString(),
-		Credentials:          credentials,
+		Name:           plan.Name.ValueString(),
+		Adapter:        adapter,
+		Hostname:       plan.Hostname.ValueString(),
+		Database:       plan.Database.ValueString(),
+		Ssl:            plan.Ssl.ValueBool(),
+		Cacertfile:     plan.Cacertfile.ValueString(),
+		Keyfile:        plan.Keyfile.ValueString(),
+		Certfile:       plan.Certfile.ValueString(),
+		RestrictAccess: plan.RestrictAccess.ValueBool(),
+		Group:          plan.Group.ValueString(),
+		SlackChannel:   plan.SlackChannel.ValueString(),
+		AgentId:        plan.AgentId.ValueString(),
+		Credentials:    credentials,
 	}
 
 	database, err := r.client.CreateDatabase(input)
@@ -277,7 +269,6 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Database = types.StringValue(database.Database)
 	state.Ssl = types.BoolValue(database.Ssl)
 	state.RestrictAccess = types.BoolValue(database.RestrictAccess)
-	state.EnableDataProtection = types.BoolValue(database.EnableDataProtection)
 
 	if database.SlackChannel != "" {
 		state.SlackChannel = types.StringValue(database.SlackChannel)
@@ -342,20 +333,19 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	input := devhub.Database{
-		Name:                 plan.Name.ValueString(),
-		Adapter:              adapter,
-		Hostname:             plan.Hostname.ValueString(),
-		Database:             plan.Database.ValueString(),
-		Ssl:                  plan.Ssl.ValueBool(),
-		Cacertfile:           plan.Cacertfile.ValueString(),
-		Keyfile:              plan.Keyfile.ValueString(),
-		Certfile:             plan.Certfile.ValueString(),
-		RestrictAccess:       plan.RestrictAccess.ValueBool(),
-		EnableDataProtection: plan.EnableDataProtection.ValueBool(),
-		Group:                plan.Group.ValueString(),
-		SlackChannel:         plan.SlackChannel.ValueString(),
-		AgentId:              plan.AgentId.ValueString(),
-		Credentials:          credentials,
+		Name:           plan.Name.ValueString(),
+		Adapter:        adapter,
+		Hostname:       plan.Hostname.ValueString(),
+		Database:       plan.Database.ValueString(),
+		Ssl:            plan.Ssl.ValueBool(),
+		Cacertfile:     plan.Cacertfile.ValueString(),
+		Keyfile:        plan.Keyfile.ValueString(),
+		Certfile:       plan.Certfile.ValueString(),
+		RestrictAccess: plan.RestrictAccess.ValueBool(),
+		Group:          plan.Group.ValueString(),
+		SlackChannel:   plan.SlackChannel.ValueString(),
+		AgentId:        plan.AgentId.ValueString(),
+		Credentials:    credentials,
 	}
 
 	// Update existing order

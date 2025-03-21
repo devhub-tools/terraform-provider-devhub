@@ -46,7 +46,6 @@ resource "devhub_querydesk_database" "example" {
 - `agent_id` (String) The agent id for the database.
 - `cacertfile` (String, Sensitive) The server ca cert to use with ssl connections, `ssl` must be set to `true`.
 - `certfile` (String, Sensitive) The client cert to use with ssl connections, `ssl` must be set to `true`.
-- `enable_data_protection` (Boolean) Whether to enable data protection for this database (only available on Enterprise plan).
 - `group` (String) The group this database belongs to, used for UI grouping.
 - `keyfile` (String, Sensitive) The client key to use with ssl connections, `ssl` must be set to `true`.
 - `restrict_access` (Boolean) Whether access to this databases should be explicitly granted to users or if any authenticated user can access it.
