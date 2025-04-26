@@ -331,6 +331,7 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
+	state.Id = types.StringValue(workspace.Id)
 	state.Name = types.StringValue(workspace.Name)
 	state.Repository = types.StringValue(workspace.Repository)
 
