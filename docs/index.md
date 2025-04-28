@@ -14,7 +14,7 @@ description: |-
 
 ```terraform
 provider "devhub" {
-  host    = "https://api.devhub.tools"
+  host    = "https://api.devhub.cloud"
   api_key = "dh_b3JnXzAx..."
 }
 ```
