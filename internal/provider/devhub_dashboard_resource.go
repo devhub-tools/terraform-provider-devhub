@@ -8,12 +8,13 @@ import (
 	"fmt"
 	devhub "terraform-provider-devhub/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -108,6 +109,11 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						},
 						"query_details": schema.SingleNestedAttribute{
 							Optional: true,
+							Validators: []validator.Object{
+								objectvalidator.ExactlyOneOf(
+									path.MatchRelative().AtParent().AtName("query_details"),
+								),
+							},
 							Attributes: map[string]schema.Attribute{
 								"query": schema.StringAttribute{
 									MarkdownDescription: "The SQL query to execute.",
@@ -123,14 +129,6 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 		},
-	}
-}
-
-func (r *dashboardResource) ConfigValidators(ctx context.Context) []resource.ConfigValidator {
-	return []resource.ConfigValidator{
-		resourcevalidator.ExactlyOneOf(
-			path.MatchRoot("panels").AtAnyListIndex().AtName("query_details"),
-		),
 	}
 }
 

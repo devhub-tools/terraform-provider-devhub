@@ -8,7 +8,7 @@ import (
 	"fmt"
 	devhub "terraform-provider-devhub/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -158,6 +158,15 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 						},
 						"api_action": schema.SingleNestedAttribute{
 							Optional: true,
+							Validators: []validator.Object{
+								objectvalidator.ExactlyOneOf(
+									path.MatchRelative().AtParent().AtName("api_action"),
+									path.MatchRelative().AtParent().AtName("approval_action"),
+									path.MatchRelative().AtParent().AtName("query_action"),
+									path.MatchRelative().AtParent().AtName("slack_action"),
+									path.MatchRelative().AtParent().AtName("slack_reply_action"),
+								),
+							},
 							Attributes: map[string]schema.Attribute{
 								"endpoint": schema.StringAttribute{
 									MarkdownDescription: "The endpoint for the API request.",
@@ -257,18 +266,6 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 		},
-	}
-}
-
-func (r workflowResource) ConfigValidators(ctx context.Context) []resource.ConfigValidator {
-	return []resource.ConfigValidator{
-		resourcevalidator.ExactlyOneOf(
-			path.MatchRoot("steps").AtAnyListIndex().AtName("api_action"),
-			path.MatchRoot("steps").AtAnyListIndex().AtName("approval_action"),
-			path.MatchRoot("steps").AtAnyListIndex().AtName("query_action"),
-			path.MatchRoot("steps").AtAnyListIndex().AtName("slack_action"),
-			path.MatchRoot("steps").AtAnyListIndex().AtName("slack_reply_action"),
-		),
 	}
 }
 

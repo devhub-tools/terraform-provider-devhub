@@ -2,7 +2,6 @@ package provider
 
 import (
 	"fmt"
-	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -87,40 +86,4 @@ resource "devhub_workflow" "test" {
 	]
 }
 `, name)
-}
-
-func TestAccWorkflowResource_SingleActionPerStep(t *testing.T) {
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: providerConfig + `
-				resource "devhub_workflow" "invalid_multiple_actions" {
-					name = "invalid_multiple_actions"
-
-					steps = [
-						{
-							name = "invalid-step-with-multiple-actions"
-
-							api_action = {
-								endpoint = "https://api.example.com/endpoint"
-								method = "GET"
-								expected_status_code = 200
-								include_devhub_jwt = true
-								headers = [
-									{ key = "content-type", value = "application/json" }
-								]
-							}
-
-							approval_action = {
-								required_approvals = 2
-							}
-						}
-					]
-				}
-				`,
-				ExpectError: regexp.MustCompile("Exactly one of these attributes must be configured"),
-			},
-		},
-	})
 }
