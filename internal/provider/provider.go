@@ -122,6 +122,7 @@ func (p *devhubProvider) DataSources(_ context.Context) []func() datasource.Data
 
 func (p *devhubProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		DashboardResource,
 		DatabaseResource,
 		TerradeskWorkspaceResource,
 		WorkflowResource,

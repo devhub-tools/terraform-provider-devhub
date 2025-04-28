@@ -108,3 +108,28 @@ type WorkflowStepActionApiHeader struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
+
+type Dashboard struct {
+	Id     string           `json:"id"`
+	Name   string           `json:"name"`
+	Panels []DashboardPanel `json:"panels"`
+}
+
+type DashboardPanel struct {
+	Id      string                 `json:"id"`
+	Title   string                 `json:"title"`
+	Inputs  []DashboardPanelInput  `json:"inputs"`
+	Details *DashboardPanelDetails `json:"details"`
+}
+
+type DashboardPanelInput struct {
+	Key         string `json:"key"`
+	Description string `json:"description"`
+}
+
+type DashboardPanelDetails struct {
+	Type string `json:"__type__"`
+	// QueryPanel fields
+	Query        string `json:"query"`
+	CredentialId string `json:"credential_id"`
+}
