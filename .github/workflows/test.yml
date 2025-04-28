@@ -80,7 +80,7 @@ jobs:
 
       - env:
           TF_ACC: "1"
-          DEVHUB_HOST: https://private.devhub.tools
+          DEVHUB_HOST: https://private.devhub.cloud
           DEVHUB_API_KEY: ${{ secrets.DEVHUB_API_KEY }}
         run: go test -v -cover ./...
         timeout-minutes: 10
