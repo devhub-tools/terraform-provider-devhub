@@ -67,6 +67,14 @@ resource "devhub_dashboard" "test" {
 				query = "SELECT * FROM users WHERE id = '$${user_id}'"
 				credential_id = "123"
 			}
+		},
+    {
+      title = "Users"
+
+			query_details = {
+				query = "SELECT * FROM users WHERE id = '$${user_id}'"
+				credential_id = "123"
+			}
 		}
 	]
 }
