@@ -61,10 +61,15 @@ type Secret struct {
 }
 
 type Workflow struct {
-	Id     string          `json:"id"`
-	Name   string          `json:"name"`
-	Inputs []WorkflowInput `json:"inputs"`
-	Steps  []WorkflowStep  `json:"steps"`
+	Id                 string             `json:"id"`
+	Name               string             `json:"name"`
+	TriggerLinearLabel TriggerLinearLabel `json:"trigger_linear_label"`
+	Inputs             []WorkflowInput    `json:"inputs"`
+	Steps              []WorkflowStep     `json:"steps"`
+}
+
+type TriggerLinearLabel struct {
+	Name string `json:"name"`
 }
 
 type WorkflowInput struct {

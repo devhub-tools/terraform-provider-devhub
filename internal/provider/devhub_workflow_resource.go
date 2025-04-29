@@ -32,10 +32,11 @@ func WorkflowResource() resource.Resource {
 
 // WorkflowResourceModel describes the resource data model.
 type workflowResourceModel struct {
-	Id     types.String         `tfsdk:"id"`
-	Name   types.String         `tfsdk:"name"`
-	Inputs []workflowInputModel `tfsdk:"inputs"`
-	Steps  []workflowStepModel  `tfsdk:"steps"`
+	Id                     types.String         `tfsdk:"id"`
+	Name                   types.String         `tfsdk:"name"`
+	TriggerLinearLabelName types.String         `tfsdk:"trigger_linear_label_name"`
+	Inputs                 []workflowInputModel `tfsdk:"inputs"`
+	Steps                  []workflowStepModel  `tfsdk:"steps"`
 }
 
 type workflowInputModel struct {
@@ -113,6 +114,10 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the workflow.",
 				Required:            true,
+			},
+			"trigger_linear_label_name": schema.StringAttribute{
+				MarkdownDescription: "The name of the Linear label that should trigger the workflow.",
+				Optional:            true,
 			},
 			"inputs": schema.ListNestedAttribute{
 				Optional: true,
@@ -349,9 +354,10 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	input := devhub.Workflow{
-		Name:   plan.Name.ValueString(),
-		Inputs: inputs,
-		Steps:  steps,
+		Name:               plan.Name.ValueString(),
+		TriggerLinearLabel: devhub.TriggerLinearLabel{Name: plan.TriggerLinearLabelName.ValueString()},
+		Inputs:             inputs,
+		Steps:              steps,
 	}
 
 	createdWorkflow, err := r.client.CreateWorkflow(input)
@@ -402,6 +408,12 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	state.Id = types.StringValue(workflow.Id)
 	state.Name = types.StringValue(workflow.Name)
+
+	if workflow.TriggerLinearLabel.Name == "" {
+		state.TriggerLinearLabelName = types.StringNull()
+	} else {
+		state.TriggerLinearLabelName = types.StringValue(workflow.TriggerLinearLabel.Name)
+	}
 
 	var stateInputs []workflowInputModel
 	for _, input := range workflow.Inputs {
@@ -550,10 +562,11 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	workflow := devhub.Workflow{
-		Id:     plan.Id.ValueString(),
-		Name:   plan.Name.ValueString(),
-		Inputs: inputs,
-		Steps:  steps,
+		Id:                 plan.Id.ValueString(),
+		Name:               plan.Name.ValueString(),
+		TriggerLinearLabel: devhub.TriggerLinearLabel{Name: plan.TriggerLinearLabelName.ValueString()},
+		Inputs:             inputs,
+		Steps:              steps,
 	}
 
 	updatedWorkflow, err := r.client.UpdateWorkflow(plan.Id.ValueString(), workflow)
