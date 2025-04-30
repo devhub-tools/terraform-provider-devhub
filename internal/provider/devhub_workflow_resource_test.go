@@ -37,7 +37,6 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.slack_channel", "#general"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.message", "Hello, world!"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.link_text", "Click here"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.name", "slack-reply-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_reply_action.reply_to_step_name", "slack-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_reply_action.message", "Hello, world!"),
 					resource.TestCheckResourceAttrSet("devhub_workflow.test", "id"),
@@ -78,7 +77,6 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.slack_channel", "#general"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.message", "Hello, world!"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.link_text", "Click here"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.name", "slack-reply-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_reply_action.reply_to_step_name", "slack-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_reply_action.message", "Hello, world!"),
 					resource.TestCheckResourceAttrSet("devhub_workflow.test", "id"),
@@ -140,7 +138,6 @@ resource "devhub_workflow" "test" {
 			}
 		},
 		{
-			name = "slack-reply-step"
 			slack_reply_action = {
 				reply_to_step_name = "slack-step"
 				message = "Hello, world!"

@@ -298,8 +298,10 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 
 	var steps []devhub.WorkflowStep
 	for _, step := range plan.Steps {
-		workflowStep := devhub.WorkflowStep{
-			Name: step.Name.ValueString(),
+		workflowStep := devhub.WorkflowStep{}
+
+		if step.Name.ValueString() != "" {
+			workflowStep.Name = step.Name.ValueString()
 		}
 
 		if step.ApiAction != nil {
@@ -439,8 +441,11 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 	var stateSteps []workflowStepModel
 	for _, step := range workflow.Steps {
 		stepModel := workflowStepModel{
-			Id:   types.StringValue(step.Id),
-			Name: types.StringValue(step.Name),
+			Id: types.StringValue(step.Id),
+		}
+
+		if step.Name != "" {
+			stepModel.Name = types.StringValue(step.Name)
 		}
 
 		switch step.Action.Type {
@@ -524,8 +529,11 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 	var steps []devhub.WorkflowStep
 	for _, step := range plan.Steps {
 		workflowStep := devhub.WorkflowStep{
-			Id:   step.Id.ValueString(),
-			Name: step.Name.ValueString(),
+			Id: step.Id.ValueString(),
+		}
+
+		if step.Name.ValueString() != "" {
+			workflowStep.Name = step.Name.ValueString()
 		}
 
 		if step.ApiAction != nil {
