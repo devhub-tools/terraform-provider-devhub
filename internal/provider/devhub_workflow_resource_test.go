@@ -19,7 +19,6 @@ func TestAccWorkflowResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("devhub_workflow.test", "name", name),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.key", "user_id"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.description", "User ID"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.type", "string"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.name", "approval-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.approval_action.reviews_required", "1"),
@@ -61,7 +60,6 @@ func TestAccWorkflowResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("devhub_workflow.test", "name", name+"_updated"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.key", "user_id"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.description", "User ID"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.type", "string"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.name", "approval-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.approval_action.reviews_required", "1"),
@@ -103,7 +101,6 @@ resource "devhub_workflow" "test" {
   inputs = [
     {
       key = "user_id"
-      description = "User ID"
       type = "string"
     }
   ]

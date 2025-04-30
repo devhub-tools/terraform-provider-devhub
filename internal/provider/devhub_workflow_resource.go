@@ -283,12 +283,17 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	var inputs []devhub.WorkflowInput
-	for _, input := range plan.Inputs {
-		inputs = append(inputs, devhub.WorkflowInput{
-			Key:         input.Key.ValueString(),
-			Description: input.Description.ValueString(),
-			Type:        input.Type.ValueString(),
-		})
+	for _, planInput := range plan.Inputs {
+		input := devhub.WorkflowInput{
+			Key:  planInput.Key.ValueString(),
+			Type: planInput.Type.ValueString(),
+		}
+
+		if planInput.Description.ValueString() != "" {
+			input.Description = planInput.Description.ValueString()
+		}
+
+		inputs = append(inputs, input)
 	}
 
 	var steps []devhub.WorkflowStep
@@ -416,12 +421,17 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	var stateInputs []workflowInputModel
-	for _, input := range workflow.Inputs {
-		stateInputs = append(stateInputs, workflowInputModel{
-			Key:         types.StringValue(input.Key),
-			Description: types.StringValue(input.Description),
-			Type:        types.StringValue(input.Type),
-		})
+	for _, stateInput := range workflow.Inputs {
+		input := workflowInputModel{
+			Key:  types.StringValue(stateInput.Key),
+			Type: types.StringValue(stateInput.Type),
+		}
+
+		if stateInput.Description != "" {
+			input.Description = types.StringValue(stateInput.Description)
+		}
+
+		stateInputs = append(stateInputs, input)
 	}
 
 	state.Inputs = stateInputs
@@ -498,12 +508,17 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	var inputs []devhub.WorkflowInput
-	for _, input := range plan.Inputs {
-		inputs = append(inputs, devhub.WorkflowInput{
-			Key:         input.Key.ValueString(),
-			Description: input.Description.ValueString(),
-			Type:        input.Type.ValueString(),
-		})
+	for _, planInput := range plan.Inputs {
+		input := devhub.WorkflowInput{
+			Key:  planInput.Key.ValueString(),
+			Type: planInput.Type.ValueString(),
+		}
+
+		if planInput.Description.ValueString() != "" {
+			input.Description = planInput.Description.ValueString()
+		}
+
+		inputs = append(inputs, input)
 	}
 
 	var steps []devhub.WorkflowStep
