@@ -29,7 +29,7 @@ resource "devhub_dashboard" "example" {
       ]
 
       query_details = {
-        query         = "SELECT * FROM users WHERE id = '${user_id}'"
+        query         = "SELECT * FROM users WHERE id = '$${user_id}'"
         credential_id = "crd_xxx"
         timeout       = 10
       }

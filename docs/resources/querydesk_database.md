@@ -54,6 +54,7 @@ resource "devhub_querydesk_database" "example" {
 
 ### Read-Only
 
+- `credential_ids` (Map of String) A map of credential IDs by username.
 - `id` (String) Database id.
 
 <a id="nestedatt--credentials"></a>

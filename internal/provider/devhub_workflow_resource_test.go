@@ -22,12 +22,31 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.description", "User ID"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.type", "string"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.name", "approval-step"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.endpoint", "https://api.example.com/endpoint"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.method", "GET"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.expected_status_code", "200"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.include_devhub_jwt", "true"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.headers.0.key", "content-type"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.headers.0.value", "application/json"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.approval_action.reviews_required", "1"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.name", "api-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.endpoint", "https://api.example.com/endpoint"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.method", "GET"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.expected_status_code", "200"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.include_devhub_jwt", "true"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.headers.0.key", "content-type"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.headers.0.value", "application/json"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.2.name", "query-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.2.query_action.query", "SELECT * FROM users WHERE id = '${user_id}'"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.2.query_action.timeout", "10"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.2.query_action.credential_id", "crd_123"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.name", "slack-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.slack_channel", "#general"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.message", "Hello, world!"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.link_text", "Click here"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.name", "slack-reply-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_reply_action.reply_to_step_name", "slack-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_reply_action.message", "Hello, world!"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.0.id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.1.id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.2.id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.3.id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.4.id"),
 				),
 			},
 			// ImportState testing
@@ -45,12 +64,31 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.description", "User ID"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.type", "string"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.name", "approval-step"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.endpoint", "https://api.example.com/endpoint"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.method", "GET"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.expected_status_code", "200"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.include_devhub_jwt", "true"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.headers.0.key", "content-type"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.api_action.headers.0.value", "application/json"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.approval_action.reviews_required", "1"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.name", "api-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.endpoint", "https://api.example.com/endpoint"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.method", "GET"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.expected_status_code", "200"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.include_devhub_jwt", "true"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.headers.0.key", "content-type"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.1.api_action.headers.0.value", "application/json"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.2.name", "query-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.2.query_action.query", "SELECT * FROM users WHERE id = '${user_id}'"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.2.query_action.timeout", "10"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.2.query_action.credential_id", "crd_123"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.name", "slack-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.slack_channel", "#general"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.message", "Hello, world!"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.slack_action.link_text", "Click here"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.name", "slack-reply-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_reply_action.reply_to_step_name", "slack-step"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_reply_action.message", "Hello, world!"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.0.id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.1.id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.2.id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.3.id"),
+					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.4.id"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -70,9 +108,14 @@ resource "devhub_workflow" "test" {
     }
   ]
   steps = [
-    {
-      name = "approval-step"
-
+		{
+			name = "approval-step"
+			approval_action = {
+				reviews_required = 1
+			}
+		},
+		{
+      name = "api-step"
 			api_action = {
 				endpoint = "https://api.example.com/endpoint"
 				method = "GET"
@@ -81,6 +124,29 @@ resource "devhub_workflow" "test" {
 				headers = [
 					{ key = "content-type", value = "application/json" }
 				]
+			}
+		},
+		{
+			name = "query-step"
+			query_action = {
+				query = "SELECT * FROM users WHERE id = '$${user_id}'"
+				credential_id = "crd_123"
+				timeout = 10
+			}
+		},
+		{
+			name = "slack-step"
+			slack_action = {
+				slack_channel = "#general"
+				message = "Hello, world!"
+				link_text = "Click here"
+			}
+		},
+		{
+			name = "slack-reply-step"
+			slack_reply_action = {
+				reply_to_step_name = "slack-step"
+				message = "Hello, world!"
 			}
 		}
 	]

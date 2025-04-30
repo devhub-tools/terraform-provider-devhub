@@ -21,7 +21,7 @@ resource "devhub_workflow" "example" {
         headers = [
           { key = "content-type", value = "application/json" }
         ]
-        body = "{\"user_id\": \"${user_id}\"}"
+        body = "{\"user_id\": \"$${user_id}\"}"
       }
     },
     {
@@ -37,7 +37,7 @@ resource "devhub_workflow" "example" {
       name = "query-step"
 
       query_action = {
-        query         = "SELECT * FROM users WHERE id = '${user_id}'"
+        query         = "SELECT * FROM users WHERE id = '$${user_id}'"
         credential_id = "crd_xxx"
         timeout       = 10
       }

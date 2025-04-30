@@ -95,7 +95,7 @@ type WorkflowStepAction struct {
 	ExpectedStatusCode int64                         `json:"expected_status_code"`
 	IncludeDevhubJwt   bool                          `json:"include_devhub_jwt"`
 	// ApprovalAction fields
-	RequiredApprovals int `json:"required_approvals"`
+	ReviewsRequired int `json:"reviews_required"`
 	// QueryAction fields
 	Timeout      int    `json:"timeout"`
 	Query        string `json:"query"`

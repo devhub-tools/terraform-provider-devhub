@@ -36,7 +36,7 @@ resource "devhub_workflow" "example" {
         headers = [
           { key = "content-type", value = "application/json" }
         ]
-        body = "{\"user_id\": \"${user_id}\"}"
+        body = "{\"user_id\": \"$${user_id}\"}"
       }
     },
     {
@@ -52,7 +52,7 @@ resource "devhub_workflow" "example" {
       name = "query-step"
 
       query_action = {
-        query         = "SELECT * FROM users WHERE id = '${user_id}'"
+        query         = "SELECT * FROM users WHERE id = '$${user_id}'"
         credential_id = "crd_xxx"
         timeout       = 10
       }
@@ -87,6 +87,7 @@ resource "devhub_workflow" "example" {
 ### Optional
 
 - `inputs` (Attributes List) (see [below for nested schema](#nestedatt--inputs))
+- `trigger_linear_label_name` (String) The name of the Linear label that should trigger the workflow.
 
 ### Read-Only
 
@@ -138,7 +139,7 @@ Required:
 
 Required:
 
-- `required_approvals` (Number) Number of required approvals.
+- `reviews_required` (Number) Number of required approvals.
 
 
 <a id="nestedatt--steps--query_action"></a>

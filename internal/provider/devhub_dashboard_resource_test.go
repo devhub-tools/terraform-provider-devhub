@@ -21,7 +21,7 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.title", "Users"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.inputs.0.key", "user_id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.inputs.0.description", "User ID"),
-					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.query", "SELECT * FROM users WHERE id = '${user_id}'"),
+					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.query", "SELECT * FROM users WHERE id = '$${user_id}'"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.credential_id", "123"),
 				),
 			},
@@ -39,7 +39,7 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.title", "Users"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.inputs.0.key", "user_id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.inputs.0.description", "User ID"),
-					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.query", "SELECT * FROM users WHERE id = '${user_id}'"),
+					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.query", "SELECT * FROM users WHERE id = '$${user_id}'"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.credential_id", "123"),
 				),
 			},
@@ -64,7 +64,7 @@ resource "devhub_dashboard" "test" {
 			]
 
 			query_details = {
-				query = "SELECT * FROM users WHERE id = '$${user_id}'"
+				query = "SELECT * FROM users WHERE id = '$$${user_id}'"
 				credential_id = "123"
 			}
 		},

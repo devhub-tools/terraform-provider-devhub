@@ -30,6 +30,8 @@ func TestAccDatabaseResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.1.password", "password2"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.1.reviews_required", "1"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.1.default_credential", "false"),
+					resource.TestCheckResourceAttrSet("devhub_querydesk_database.test", "credential_ids.postgres"),
+					resource.TestCheckResourceAttrSet("devhub_querydesk_database.test", "credential_ids.another"),
 				),
 			},
 			// ImportState testing
@@ -56,6 +58,8 @@ func TestAccDatabaseResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.1.password", "password2"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.1.reviews_required", "1"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.1.default_credential", "false"),
+					resource.TestCheckResourceAttrSet("devhub_querydesk_database.test", "credential_ids.postgres"),
+					resource.TestCheckResourceAttrSet("devhub_querydesk_database.test", "credential_ids.another"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase

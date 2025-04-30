@@ -9,10 +9,12 @@ import (
 	"strings"
 	devhub "terraform-provider-devhub/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -45,6 +47,7 @@ type databaseResourceModel struct {
 	SlackChannel   types.String              `tfsdk:"slack_channel"`
 	AgentId        types.String              `tfsdk:"agent_id"`
 	Credentials    []databaseCredentialModel `tfsdk:"credentials"`
+	CredentialIds  types.Map                 `tfsdk:"credential_ids"`
 }
 
 type databaseCredentialModel struct {
@@ -130,6 +133,14 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"agent_id": schema.StringAttribute{
 				MarkdownDescription: "The agent id for the database.",
 				Optional:            true,
+			},
+			"credential_ids": schema.MapAttribute{
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: "A map of credential IDs by username.",
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"credentials": schema.ListNestedAttribute{
 				Required: true,
@@ -226,10 +237,16 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 
 	plan.Id = types.StringValue(database.Id)
 
+	credentialIds := make(map[string]attr.Value)
+
 	for index, credential := range database.Credentials {
 		plan.Credentials[index].Id = types.StringValue(credential.Id)
 		plan.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
+
+		credentialIds[credential.Username] = types.StringValue(credential.Id)
 	}
+
+	plan.CredentialIds = types.MapValueMust(types.StringType, credentialIds)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -270,6 +287,12 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Ssl = types.BoolValue(database.Ssl)
 	state.RestrictAccess = types.BoolValue(database.RestrictAccess)
 
+	if database.Group != "" {
+		state.Group = types.StringValue(database.Group)
+	} else {
+		state.Group = types.StringNull()
+	}
+
 	if database.SlackChannel != "" {
 		state.SlackChannel = types.StringValue(database.SlackChannel)
 	} else {
@@ -286,12 +309,18 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.Credentials = make([]databaseCredentialModel, len(database.Credentials))
 	}
 
+	credentialIds := make(map[string]attr.Value)
+
 	for index, credential := range database.Credentials {
 		state.Credentials[index].Id = types.StringValue(credential.Id)
 		state.Credentials[index].Username = types.StringValue(credential.Username)
 		state.Credentials[index].ReviewsRequired = types.Int64Value(int64(credential.ReviewsRequired))
 		state.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
+
+		credentialIds[credential.Username] = types.StringValue(credential.Id)
 	}
+
+	state.CredentialIds = types.MapValueMust(types.StringType, credentialIds)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -349,7 +378,7 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	// Update existing order
-	_, err := r.client.UpdateDatabase(plan.Id.ValueString(), input)
+	database, err := r.client.UpdateDatabase(plan.Id.ValueString(), input)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Database",
@@ -357,6 +386,16 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		)
 		return
 	}
+
+	credentialIds := make(map[string]attr.Value)
+
+	for index, credential := range database.Credentials {
+		plan.Credentials[index].Id = types.StringValue(credential.Id)
+
+		credentialIds[credential.Username] = types.StringValue(credential.Id)
+	}
+
+	plan.CredentialIds = types.MapValueMust(types.StringType, credentialIds)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

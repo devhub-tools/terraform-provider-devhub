@@ -71,7 +71,7 @@ type workflowApiActionHeadersModel struct {
 }
 
 type workflowApprovalActionModel struct {
-	RequiredApprovals types.Int64 `tfsdk:"required_approvals"`
+	ReviewsRequired types.Int64 `tfsdk:"reviews_required"`
 }
 
 type workflowQueryActionModel struct {
@@ -214,7 +214,7 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 						"approval_action": schema.SingleNestedAttribute{
 							Optional: true,
 							Attributes: map[string]schema.Attribute{
-								"required_approvals": schema.Int64Attribute{
+								"reviews_required": schema.Int64Attribute{
 									MarkdownDescription: "Number of required approvals.",
 									Required:            true,
 								},
@@ -319,8 +319,8 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 
 		if step.ApprovalAction != nil {
 			workflowStep.Action = &devhub.WorkflowStepAction{
-				Type:              "approval",
-				RequiredApprovals: int(step.ApprovalAction.RequiredApprovals.ValueInt64()),
+				Type:            "approval",
+				ReviewsRequired: int(step.ApprovalAction.ReviewsRequired.ValueInt64()),
 			}
 		}
 
@@ -456,7 +456,7 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 			}
 		case "approval":
 			stepModel.ApprovalAction = &workflowApprovalActionModel{
-				RequiredApprovals: types.Int64Value(int64(step.Action.RequiredApprovals)),
+				ReviewsRequired: types.Int64Value(int64(step.Action.ReviewsRequired)),
 			}
 		case "query":
 			stepModel.QueryAction = &workflowQueryActionModel{
@@ -533,8 +533,8 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 			}
 		} else if step.ApprovalAction != nil {
 			workflowStep.Action = &devhub.WorkflowStepAction{
-				Type:              "approval",
-				RequiredApprovals: int(step.ApprovalAction.RequiredApprovals.ValueInt64()),
+				Type:            "approval",
+				ReviewsRequired: int(step.ApprovalAction.ReviewsRequired.ValueInt64()),
 			}
 		} else if step.QueryAction != nil {
 			workflowStep.Action = &devhub.WorkflowStepAction{
