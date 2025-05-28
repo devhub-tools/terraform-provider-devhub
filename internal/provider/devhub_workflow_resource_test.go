@@ -94,6 +94,14 @@ func TestAccWorkflowResource(t *testing.T) {
 
 func testAccWorkflowResourceConfig(name string) string {
 	return providerConfig + fmt.Sprintf(`
+data "devhub_role" "engineers" {
+  name = "Engineers"
+}
+
+data "devhub_user" "michael" {
+  email = "michael@devhub.tools"
+}
+
 resource "devhub_workflow" "test" {
   name     = %[1]q
   inputs = [
@@ -107,6 +115,16 @@ resource "devhub_workflow" "test" {
 			name = "approval-step"
 			approval_action = {
 				reviews_required = 1
+				permissions = [
+					{
+						permission = "approve"
+						role_id = data.devhub_role.engineers.id
+					},
+					{
+						permission = "approve"
+						organization_user_id = data.devhub_user.michael.id
+					}
+				]
 			}
 		},
 		{

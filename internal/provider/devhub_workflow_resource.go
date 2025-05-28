@@ -56,6 +56,13 @@ type workflowStepModel struct {
 	SlackReplyAction *workflowSlackReplyActionModel `tfsdk:"slack_reply_action"`
 }
 
+type permissionModel struct {
+	Id                 types.String `tfsdk:"id"`
+	Permission         types.String `tfsdk:"permission"`
+	RoleId             types.String `tfsdk:"role_id"`
+	OrganizationUserId types.String `tfsdk:"organization_user_id"`
+}
+
 type workflowApiActionModel struct {
 	Endpoint           types.String                    `tfsdk:"endpoint"`
 	Method             types.String                    `tfsdk:"method"`
@@ -71,7 +78,8 @@ type workflowApiActionHeadersModel struct {
 }
 
 type workflowApprovalActionModel struct {
-	ReviewsRequired types.Int64 `tfsdk:"reviews_required"`
+	ReviewsRequired types.Int64        `tfsdk:"reviews_required"`
+	Permissions     []*permissionModel `tfsdk:"permissions"`
 }
 
 type workflowQueryActionModel struct {
@@ -218,6 +226,35 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 									MarkdownDescription: "Number of required approvals.",
 									Required:            true,
 								},
+								"permissions": schema.ListNestedAttribute{
+									Optional: true,
+									NestedObject: schema.NestedAttributeObject{
+										Attributes: map[string]schema.Attribute{
+											"id": schema.StringAttribute{
+												MarkdownDescription: "Permission ID.",
+												Computed:            true,
+											},
+											"permission": schema.StringAttribute{
+												MarkdownDescription: "The permission granted to the role or user.",
+												Required:            true,
+											},
+											"role_id": schema.StringAttribute{
+												MarkdownDescription: "The id of the role.",
+												Optional:            true,
+												Validators: []validator.String{
+													stringvalidator.ExactlyOneOf(
+														path.MatchRelative().AtParent().AtName("role_id"),
+														path.MatchRelative().AtParent().AtName("organization_user_id"),
+													),
+												},
+											},
+											"organization_user_id": schema.StringAttribute{
+												MarkdownDescription: "The id of the organization user.",
+												Optional:            true,
+											},
+										},
+									},
+								},
 							},
 						},
 						"query_action": schema.SingleNestedAttribute{
@@ -304,6 +341,8 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 			workflowStep.Name = step.Name.ValueString()
 		}
 
+		workflowStep.Permissions = make([]*devhub.Permission, 0)
+
 		if step.ApiAction != nil {
 			var headers []devhub.WorkflowStepActionApiHeader
 			for _, header := range step.ApiAction.Headers {
@@ -328,6 +367,14 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 			workflowStep.Action = &devhub.WorkflowStepAction{
 				Type:            "approval",
 				ReviewsRequired: int(step.ApprovalAction.ReviewsRequired.ValueInt64()),
+			}
+
+			for _, permission := range step.ApprovalAction.Permissions {
+				workflowStep.Permissions = append(workflowStep.Permissions, &devhub.Permission{
+					Permission:         permission.Permission.ValueString(),
+					RoleId:             permission.RoleId.ValueString(),
+					OrganizationUserId: permission.OrganizationUserId.ValueString(),
+				})
 			}
 		}
 
@@ -381,6 +428,12 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 
 	for index, step := range createdWorkflow.Steps {
 		plan.Steps[index].Id = types.StringValue(step.Id)
+
+		if step.Action.Type == "approval" {
+			for permissionIndex, permission := range step.Permissions {
+				plan.Steps[index].ApprovalAction.Permissions[permissionIndex].Id = types.StringValue(permission.Id)
+			}
+		}
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -470,9 +523,30 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 				stepModel.ApiAction.Body = types.StringValue(step.Action.Body)
 			}
 		case "approval":
+			permissions := make([]*permissionModel, 0)
+
+			for _, permission := range step.Permissions {
+				permissionModel := permissionModel{
+					Id:         types.StringValue(permission.Id),
+					Permission: types.StringValue(permission.Permission),
+				}
+
+				if permission.RoleId != "" {
+					permissionModel.RoleId = types.StringValue(permission.RoleId)
+				}
+
+				if permission.OrganizationUserId != "" {
+					permissionModel.OrganizationUserId = types.StringValue(permission.OrganizationUserId)
+				}
+
+				permissions = append(permissions, &permissionModel)
+			}
+
 			stepModel.ApprovalAction = &workflowApprovalActionModel{
 				ReviewsRequired: types.Int64Value(int64(step.Action.ReviewsRequired)),
+				Permissions:     permissions,
 			}
+
 		case "query":
 			stepModel.QueryAction = &workflowQueryActionModel{
 				Timeout:      types.Int64Value(int64(step.Action.Timeout)),
@@ -536,6 +610,8 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 			workflowStep.Name = step.Name.ValueString()
 		}
 
+		workflowStep.Permissions = make([]*devhub.Permission, 0)
+
 		if step.ApiAction != nil {
 			var headers []devhub.WorkflowStepActionApiHeader
 			for _, header := range step.ApiAction.Headers {
@@ -558,6 +634,23 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 			workflowStep.Action = &devhub.WorkflowStepAction{
 				Type:            "approval",
 				ReviewsRequired: int(step.ApprovalAction.ReviewsRequired.ValueInt64()),
+			}
+
+			for _, permission := range step.ApprovalAction.Permissions {
+				permissionModel := devhub.Permission{
+					Id:         permission.Id.ValueString(),
+					Permission: permission.Permission.ValueString(),
+				}
+
+				if permission.RoleId.ValueString() != "" {
+					permissionModel.RoleId = permission.RoleId.ValueString()
+				}
+
+				if permission.OrganizationUserId.ValueString() != "" {
+					permissionModel.OrganizationUserId = permission.OrganizationUserId.ValueString()
+				}
+
+				workflowStep.Permissions = append(workflowStep.Permissions, &permissionModel)
 			}
 		} else if step.QueryAction != nil {
 			workflowStep.Action = &devhub.WorkflowStepAction{
@@ -603,6 +696,12 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 
 	for index, step := range updatedWorkflow.Steps {
 		plan.Steps[index].Id = types.StringValue(step.Id)
+
+		if step.Action.Type == "approval" {
+			for permissionIndex, permission := range step.Permissions {
+				plan.Steps[index].ApprovalAction.Permissions[permissionIndex].Id = types.StringValue(permission.Id)
+			}
+		}
 	}
 
 	diags = resp.State.Set(ctx, plan)

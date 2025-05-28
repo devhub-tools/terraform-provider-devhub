@@ -82,7 +82,8 @@ type WorkflowStep struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
 	// Action fields
-	Action *WorkflowStepAction `json:"action"`
+	Action      *WorkflowStepAction `json:"action"`
+	Permissions []*Permission       `json:"permissions"`
 }
 
 type WorkflowStepAction struct {
@@ -137,4 +138,24 @@ type DashboardPanelDetails struct {
 	// QueryPanel fields
 	Query        string `json:"query"`
 	CredentialId string `json:"credential_id"`
+}
+
+type Permission struct {
+	Id                 string `json:"id"`
+	Permission         string `json:"permission"`
+	RoleId             string `json:"role_id"`
+	OrganizationUserId string `json:"organization_user_id"`
+}
+
+type Role struct {
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Managed     bool   `json:"managed"`
+}
+
+type User struct {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
