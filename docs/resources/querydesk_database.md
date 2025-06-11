@@ -35,7 +35,7 @@ resource "devhub_querydesk_database" "example" {
 
 ### Required
 
-- `adapter` (String) The adapter to use to establish the connection. Currently only `POSTGRES` and `MYSQL` are supported, but  sql server is on the roadmap.
+- `adapter` (String) The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL` and `CLICKHOUSE` are supported.
 - `credentials` (Attributes List) (see [below for nested schema](#nestedatt--credentials))
 - `database` (String) The name of the database to connect to.
 - `hostname` (String) The hostname for connecting to the database, either an ip or url.

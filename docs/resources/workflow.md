@@ -141,6 +141,27 @@ Required:
 
 - `reviews_required` (Number) Number of required approvals.
 
+Optional:
+
+- `permissions` (Attributes List) (see [below for nested schema](#nestedatt--steps--approval_action--permissions))
+
+<a id="nestedatt--steps--approval_action--permissions"></a>
+### Nested Schema for `steps.approval_action.permissions`
+
+Required:
+
+- `permission` (String) The permission granted to the role or user.
+
+Optional:
+
+- `organization_user_id` (String) The id of the organization user.
+- `role_id` (String) The id of the role.
+
+Read-Only:
+
+- `id` (String) Permission ID.
+
+
 
 <a id="nestedatt--steps--query_action"></a>
 ### Nested Schema for `steps.query_action`
