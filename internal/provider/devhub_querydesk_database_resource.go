@@ -84,7 +84,7 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required:            true,
 			},
 			"adapter": schema.StringAttribute{
-				MarkdownDescription: "The adapter to use to establish the connection. Currently only `POSTGRES` and `MYSQL` are supported, but  sql server is on the roadmap.",
+				MarkdownDescription: "The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL` and `CLICKHOUSE` are supported.",
 				Required:            true,
 			},
 			"database": schema.StringAttribute{
@@ -188,17 +188,6 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	var adapter string
-	switch plan.Adapter.ValueString() {
-	case "POSTGRES":
-		adapter = "postgres"
-	case "MYSQL":
-		adapter = "mysql"
-	default:
-		resp.Diagnostics.AddError("Unexpected Database Adapter", fmt.Sprintf("Expected `POSTGRES` or `MYSQL`, got: %s.", plan.Adapter.String()))
-		return
-	}
-
 	var credentials []devhub.DatabaseCredential
 	for _, credential := range plan.Credentials {
 		credentials = append(credentials, devhub.DatabaseCredential{
@@ -211,7 +200,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 
 	input := devhub.Database{
 		Name:           plan.Name.ValueString(),
-		Adapter:        adapter,
+		Adapter:        strings.ToLower(plan.Adapter.ValueString()),
 		Hostname:       plan.Hostname.ValueString(),
 		Database:       plan.Database.ValueString(),
 		Ssl:            plan.Ssl.ValueBool(),
@@ -339,17 +328,6 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	var adapter string
-	switch plan.Adapter.ValueString() {
-	case "POSTGRES":
-		adapter = "postgres"
-	case "MYSQL":
-		adapter = "mysql"
-	default:
-		resp.Diagnostics.AddError("Unexpected Database Adapter", fmt.Sprintf("Expected `POSTGRES` or `MYSQL`, got: %s.", plan.Adapter.String()))
-		return
-	}
-
 	var credentials []devhub.DatabaseCredential
 	for _, credential := range plan.Credentials {
 		credentials = append(credentials, devhub.DatabaseCredential{
@@ -363,7 +341,7 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 
 	input := devhub.Database{
 		Name:           plan.Name.ValueString(),
-		Adapter:        adapter,
+		Adapter:        strings.ToLower(plan.Adapter.ValueString()),
 		Hostname:       plan.Hostname.ValueString(),
 		Database:       plan.Database.ValueString(),
 		Ssl:            plan.Ssl.ValueBool(),
