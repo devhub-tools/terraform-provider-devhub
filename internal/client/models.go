@@ -5,6 +5,7 @@ type Database struct {
 	Name           string               `json:"name"`
 	Adapter        string               `json:"adapter"`
 	Hostname       string               `json:"hostname"`
+	Port           int64                `json:"port"`
 	Database       string               `json:"database"`
 	Ssl            bool                 `json:"ssl"`
 	Cacertfile     string               `json:"cacertfile"`
@@ -21,6 +22,7 @@ type DatabaseCredential struct {
 	Id                string `json:"id"`
 	Username          string `json:"username"`
 	Password          string `json:"password"`
+	Hostname          string `json:"hostname"`
 	ReviewsRequired   int    `json:"reviews_required"`
 	DefaultCredential bool   `json:"default_credential"`
 }
@@ -116,9 +118,10 @@ type WorkflowStepActionApiHeader struct {
 }
 
 type Dashboard struct {
-	Id     string           `json:"id"`
-	Name   string           `json:"name"`
-	Panels []DashboardPanel `json:"panels"`
+	Id               string           `json:"id"`
+	Name             string           `json:"name"`
+	RestrictedAccess bool             `json:"restricted_access"`
+	Panels           []DashboardPanel `json:"panels"`
 }
 
 type DashboardPanel struct {
