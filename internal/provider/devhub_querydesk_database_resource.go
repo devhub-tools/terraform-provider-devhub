@@ -37,6 +37,7 @@ type databaseResourceModel struct {
 	Name           types.String              `tfsdk:"name"`
 	Adapter        types.String              `tfsdk:"adapter"`
 	Hostname       types.String              `tfsdk:"hostname"`
+	Port           types.Int64               `tfsdk:"port"`
 	Database       types.String              `tfsdk:"database"`
 	Ssl            types.Bool                `tfsdk:"ssl"`
 	Cacertfile     types.String              `tfsdk:"cacertfile"`
@@ -54,6 +55,7 @@ type databaseCredentialModel struct {
 	Id                types.String `tfsdk:"id"`
 	Username          types.String `tfsdk:"username"`
 	Password          types.String `tfsdk:"password"`
+	Hostname          types.String `tfsdk:"hostname"`
 	ReviewsRequired   types.Int64  `tfsdk:"reviews_required"`
 	DefaultCredential types.Bool   `tfsdk:"default_credential"`
 }
@@ -84,8 +86,12 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required:            true,
 			},
 			"adapter": schema.StringAttribute{
-				MarkdownDescription: "The adapter to use to establish the connection. Currently only `POSTGRES` and `MYSQL` are supported, but  sql server is on the roadmap.",
+				MarkdownDescription: "The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL` and `CLICKHOUSE` are supported.",
 				Required:            true,
+			},
+			"port": schema.Int64Attribute{
+				MarkdownDescription: "The port to connect to the database on, if not specified the default port for the database type will be used.",
+				Optional:            true,
 			},
 			"database": schema.StringAttribute{
 				MarkdownDescription: "The name of the database to connect to.",
@@ -162,6 +168,10 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 							Required:            true,
 							Sensitive:           true,
 						},
+						"hostname": schema.StringAttribute{
+							MarkdownDescription: "The hostname to use for connecting to the database when using this credential (overrides the default hostname).",
+							Optional:            true,
+						},
 						"reviews_required": schema.Int64Attribute{
 							MarkdownDescription: "The number of reviews required before a query can be executed.",
 							Required:            true,
@@ -188,22 +198,12 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	var adapter string
-	switch plan.Adapter.ValueString() {
-	case "POSTGRES":
-		adapter = "postgres"
-	case "MYSQL":
-		adapter = "mysql"
-	default:
-		resp.Diagnostics.AddError("Unexpected Database Adapter", fmt.Sprintf("Expected `POSTGRES` or `MYSQL`, got: %s.", plan.Adapter.String()))
-		return
-	}
-
 	var credentials []devhub.DatabaseCredential
 	for _, credential := range plan.Credentials {
 		credentials = append(credentials, devhub.DatabaseCredential{
 			Username:          credential.Username.ValueString(),
 			Password:          credential.Password.ValueString(),
+			Hostname:          credential.Hostname.ValueString(),
 			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
 			DefaultCredential: credential.DefaultCredential.ValueBool(),
 		})
@@ -211,8 +211,9 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 
 	input := devhub.Database{
 		Name:           plan.Name.ValueString(),
-		Adapter:        adapter,
+		Adapter:        strings.ToLower(plan.Adapter.ValueString()),
 		Hostname:       plan.Hostname.ValueString(),
+		Port:           plan.Port.ValueInt64(),
 		Database:       plan.Database.ValueString(),
 		Ssl:            plan.Ssl.ValueBool(),
 		Cacertfile:     plan.Cacertfile.ValueString(),
@@ -287,22 +288,25 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Ssl = types.BoolValue(database.Ssl)
 	state.RestrictAccess = types.BoolValue(database.RestrictAccess)
 
+	state.Port = types.Int64Null()
+	state.Group = types.StringNull()
+	state.SlackChannel = types.StringNull()
+	state.AgentId = types.StringNull()
+
+	if database.Port != 0 {
+		state.Port = types.Int64Value(database.Port)
+	}
+
 	if database.Group != "" {
 		state.Group = types.StringValue(database.Group)
-	} else {
-		state.Group = types.StringNull()
 	}
 
 	if database.SlackChannel != "" {
 		state.SlackChannel = types.StringValue(database.SlackChannel)
-	} else {
-		state.SlackChannel = types.StringNull()
 	}
 
 	if database.AgentId != "" {
 		state.AgentId = types.StringValue(database.AgentId)
-	} else {
-		state.AgentId = types.StringNull()
 	}
 
 	if state.Credentials == nil || len(state.Credentials) != len(database.Credentials) {
@@ -316,6 +320,12 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.Credentials[index].Username = types.StringValue(credential.Username)
 		state.Credentials[index].ReviewsRequired = types.Int64Value(int64(credential.ReviewsRequired))
 		state.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
+
+		state.Credentials[index].Hostname = types.StringNull()
+
+		if credential.Hostname != "" {
+			state.Credentials[index].Hostname = types.StringValue(credential.Hostname)
+		}
 
 		credentialIds[credential.Username] = types.StringValue(credential.Id)
 	}
@@ -339,23 +349,13 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	var adapter string
-	switch plan.Adapter.ValueString() {
-	case "POSTGRES":
-		adapter = "postgres"
-	case "MYSQL":
-		adapter = "mysql"
-	default:
-		resp.Diagnostics.AddError("Unexpected Database Adapter", fmt.Sprintf("Expected `POSTGRES` or `MYSQL`, got: %s.", plan.Adapter.String()))
-		return
-	}
-
 	var credentials []devhub.DatabaseCredential
 	for _, credential := range plan.Credentials {
 		credentials = append(credentials, devhub.DatabaseCredential{
 			Id:                credential.Id.ValueString(),
 			Username:          credential.Username.ValueString(),
 			Password:          credential.Password.ValueString(),
+			Hostname:          credential.Hostname.ValueString(),
 			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
 			DefaultCredential: credential.DefaultCredential.ValueBool(),
 		})
@@ -363,8 +363,9 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 
 	input := devhub.Database{
 		Name:           plan.Name.ValueString(),
-		Adapter:        adapter,
+		Adapter:        strings.ToLower(plan.Adapter.ValueString()),
 		Hostname:       plan.Hostname.ValueString(),
+		Port:           plan.Port.ValueInt64(),
 		Database:       plan.Database.ValueString(),
 		Ssl:            plan.Ssl.ValueBool(),
 		Cacertfile:     plan.Cacertfile.ValueString(),

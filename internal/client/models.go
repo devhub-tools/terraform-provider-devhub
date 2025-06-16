@@ -5,6 +5,7 @@ type Database struct {
 	Name           string               `json:"name"`
 	Adapter        string               `json:"adapter"`
 	Hostname       string               `json:"hostname"`
+	Port           int64                `json:"port"`
 	Database       string               `json:"database"`
 	Ssl            bool                 `json:"ssl"`
 	Cacertfile     string               `json:"cacertfile"`
@@ -21,6 +22,7 @@ type DatabaseCredential struct {
 	Id                string `json:"id"`
 	Username          string `json:"username"`
 	Password          string `json:"password"`
+	Hostname          string `json:"hostname"`
 	ReviewsRequired   int    `json:"reviews_required"`
 	DefaultCredential bool   `json:"default_credential"`
 }
@@ -82,7 +84,8 @@ type WorkflowStep struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
 	// Action fields
-	Action *WorkflowStepAction `json:"action"`
+	Action      *WorkflowStepAction `json:"action"`
+	Permissions []*Permission       `json:"permissions"`
 }
 
 type WorkflowStepAction struct {
@@ -115,9 +118,10 @@ type WorkflowStepActionApiHeader struct {
 }
 
 type Dashboard struct {
-	Id     string           `json:"id"`
-	Name   string           `json:"name"`
-	Panels []DashboardPanel `json:"panels"`
+	Id               string           `json:"id"`
+	Name             string           `json:"name"`
+	RestrictedAccess bool             `json:"restricted_access"`
+	Panels           []DashboardPanel `json:"panels"`
 }
 
 type DashboardPanel struct {
@@ -137,4 +141,24 @@ type DashboardPanelDetails struct {
 	// QueryPanel fields
 	Query        string `json:"query"`
 	CredentialId string `json:"credential_id"`
+}
+
+type Permission struct {
+	Id                 string `json:"id"`
+	Permission         string `json:"permission"`
+	RoleId             string `json:"role_id"`
+	OrganizationUserId string `json:"organization_user_id"`
+}
+
+type Role struct {
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Managed     bool   `json:"managed"`
+}
+
+type User struct {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }

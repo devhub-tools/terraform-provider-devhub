@@ -31,9 +31,10 @@ func DashboardResource() resource.Resource {
 
 // DashboardResourceModel describes the resource data model.
 type dashboardResourceModel struct {
-	Id     types.String          `tfsdk:"id"`
-	Name   types.String          `tfsdk:"name"`
-	Panels []dashboardPanelModel `tfsdk:"panels"`
+	Id               types.String          `tfsdk:"id"`
+	Name             types.String          `tfsdk:"name"`
+	RestrictedAccess types.Bool            `tfsdk:"restricted_access"`
+	Panels           []dashboardPanelModel `tfsdk:"panels"`
 }
 
 type dashboardPanelModel struct {
@@ -76,6 +77,11 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the dashboard.",
 				Required:            true,
+			},
+			"restricted_access": schema.BoolAttribute{
+				MarkdownDescription: "Whether the dashboard is restricted to certain users.",
+				Optional:            true,
+				Computed:            true,
 			},
 			"panels": schema.ListNestedAttribute{
 				Optional: true,
@@ -167,8 +173,9 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	input := devhub.Dashboard{
-		Name:   plan.Name.ValueString(),
-		Panels: panels,
+		Name:             plan.Name.ValueString(),
+		RestrictedAccess: plan.RestrictedAccess.ValueBool(),
+		Panels:           panels,
 	}
 
 	createdDashboard, err := r.client.CreateDashboard(input)
@@ -182,6 +189,7 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 
 	// Set state to fully populated data
 	plan.Id = types.StringValue(createdDashboard.Id)
+	plan.RestrictedAccess = types.BoolValue(createdDashboard.RestrictedAccess)
 
 	for index, panel := range createdDashboard.Panels {
 		plan.Panels[index].Id = types.StringValue(panel.Id)
@@ -219,6 +227,7 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	state.Id = types.StringValue(dashboard.Id)
 	state.Name = types.StringValue(dashboard.Name)
+	state.RestrictedAccess = types.BoolValue(dashboard.RestrictedAccess)
 
 	var statePanels []dashboardPanelModel
 	for _, panel := range dashboard.Panels {
@@ -292,9 +301,10 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	dashboard := devhub.Dashboard{
-		Id:     plan.Id.ValueString(),
-		Name:   plan.Name.ValueString(),
-		Panels: panels,
+		Id:               plan.Id.ValueString(),
+		Name:             plan.Name.ValueString(),
+		RestrictedAccess: plan.RestrictedAccess.ValueBool(),
+		Panels:           panels,
 	}
 
 	updatedDashboard, err := r.client.UpdateDashboard(plan.Id.ValueString(), dashboard)
@@ -305,6 +315,8 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		)
 		return
 	}
+
+	plan.RestrictedAccess = types.BoolValue(updatedDashboard.RestrictedAccess)
 
 	for index, panel := range updatedDashboard.Panels {
 		plan.Panels[index].Id = types.StringValue(panel.Id)

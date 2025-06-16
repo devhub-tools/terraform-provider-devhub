@@ -117,7 +117,10 @@ func (p *devhubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 }
 
 func (p *devhubProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		NewRoleDataSource,
+		NewUserDataSource,
+	}
 }
 
 func (p *devhubProvider) Resources(ctx context.Context) []func() resource.Resource {
