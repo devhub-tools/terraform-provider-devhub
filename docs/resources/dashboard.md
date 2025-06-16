@@ -48,6 +48,7 @@ resource "devhub_dashboard" "example" {
 ### Optional
 
 - `panels` (Attributes List) (see [below for nested schema](#nestedatt--panels))
+- `restricted_access` (Boolean) Whether the dashboard is restricted to certain users.
 
 ### Read-Only
 

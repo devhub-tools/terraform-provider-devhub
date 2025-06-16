@@ -48,6 +48,7 @@ resource "devhub_querydesk_database" "example" {
 - `certfile` (String, Sensitive) The client cert to use with ssl connections, `ssl` must be set to `true`.
 - `group` (String) The group this database belongs to, used for UI grouping.
 - `keyfile` (String, Sensitive) The client key to use with ssl connections, `ssl` must be set to `true`.
+- `port` (Number) The port to connect to the database on, if not specified the default port for the database type will be used.
 - `restrict_access` (Boolean) Whether access to this databases should be explicitly granted to users or if any authenticated user can access it.
 - `slack_channel` (String) The slack channel to send query request notifications to.
 - `ssl` (Boolean) Set to `true` to turn on ssl connections for this database.
@@ -69,6 +70,7 @@ Required:
 Optional:
 
 - `default_credential` (Boolean) Whether this is the default credential for the database.
+- `hostname` (String) The hostname to use for connecting to the database when using this credential (overrides the default hostname).
 
 Read-Only:
 
