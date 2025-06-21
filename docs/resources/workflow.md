@@ -40,7 +40,16 @@ resource "devhub_workflow" "example" {
       }
     },
     {
-      name = "slack-step"
+      name = "condition-step"
+
+      condition_action = {
+        condition  = "$${user_id} == '123'"
+        when_false = "failed"
+      }
+    },
+    {
+      name      = "slack-step"
+      condition = "$${user_id} == '123'"
 
       slack_action = {
         slack_channel = "my-channel"
@@ -86,6 +95,7 @@ resource "devhub_workflow" "example" {
 
 ### Optional
 
+- `cron_schedule` (String) A cron expression evaluated using UTC time to trigger the workflow (e.g. 0 0 * * *).
 - `inputs` (Attributes List) (see [below for nested schema](#nestedatt--inputs))
 - `trigger_linear_label_name` (String) The name of the Linear label that should trigger the workflow.
 
@@ -100,6 +110,8 @@ Optional:
 
 - `api_action` (Attributes) (see [below for nested schema](#nestedatt--steps--api_action))
 - `approval_action` (Attributes) (see [below for nested schema](#nestedatt--steps--approval_action))
+- `condition` (String) Expression to evaluate if this step should run, if evaluated as true step will run, otherwise it will be skipped. If no condition is set the step will always run. You can use the input, output from previous steps, and basic operators like ==, !=, >, <, >=, <=, &&, ||, not.
+- `condition_action` (Attributes) (see [below for nested schema](#nestedatt--steps--condition_action))
 - `name` (String) The name of the step.
 - `query_action` (Attributes) (see [below for nested schema](#nestedatt--steps--query_action))
 - `slack_action` (Attributes) (see [below for nested schema](#nestedatt--steps--slack_action))
@@ -161,6 +173,15 @@ Read-Only:
 
 - `id` (String) Permission ID.
 
+
+
+<a id="nestedatt--steps--condition_action"></a>
+### Nested Schema for `steps.condition_action`
+
+Required:
+
+- `condition` (String) Expression to evaluate if workflow should continue, if evaluated as true workflow will continue. You can use the input, output from previous steps, and basic operators like ==, !=, >, <, >=, <=, &&, ||, not.
+- `when_false` (String) When false, mark workflow as: (failed, succeeded)
 
 
 <a id="nestedatt--steps--query_action"></a>

@@ -25,7 +25,16 @@ resource "devhub_workflow" "example" {
       }
     },
     {
-      name = "slack-step"
+      name = "condition-step"
+
+      condition_action = {
+        condition  = "$${user_id} == '123'"
+        when_false = "failed"
+      }
+    },
+    {
+      name      = "slack-step"
+      condition = "$${user_id} == '123'"
 
       slack_action = {
         slack_channel = "my-channel"
