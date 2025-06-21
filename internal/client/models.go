@@ -65,6 +65,7 @@ type Secret struct {
 type Workflow struct {
 	Id                 string             `json:"id"`
 	Name               string             `json:"name"`
+	CronSchedule       string             `json:"cron_schedule"`
 	TriggerLinearLabel TriggerLinearLabel `json:"trigger_linear_label"`
 	Inputs             []WorkflowInput    `json:"inputs"`
 	Steps              []WorkflowStep     `json:"steps"`
@@ -81,8 +82,9 @@ type WorkflowInput struct {
 }
 
 type WorkflowStep struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	Condition string `json:"condition"`
 	// Action fields
 	Action      *WorkflowStepAction `json:"action"`
 	Permissions []*Permission       `json:"permissions"`
@@ -109,7 +111,9 @@ type WorkflowStepAction struct {
 	LinkText     string `json:"link_text"`
 	// SlackReplyAction fields
 	ReplyToStepName string `json:"reply_to_step_name"`
-	// Message from previous step
+	// ConditionAction fields
+	Condition string `json:"condition"`
+	WhenFalse string `json:"when_false"`
 }
 
 type WorkflowStepActionApiHeader struct {

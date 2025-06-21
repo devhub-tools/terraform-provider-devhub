@@ -34,6 +34,7 @@ func WorkflowResource() resource.Resource {
 type workflowResourceModel struct {
 	Id                     types.String         `tfsdk:"id"`
 	Name                   types.String         `tfsdk:"name"`
+	CronSchedule           types.String         `tfsdk:"cron_schedule"`
 	TriggerLinearLabelName types.String         `tfsdk:"trigger_linear_label_name"`
 	Inputs                 []workflowInputModel `tfsdk:"inputs"`
 	Steps                  []workflowStepModel  `tfsdk:"steps"`
@@ -46,11 +47,13 @@ type workflowInputModel struct {
 }
 
 type workflowStepModel struct {
-	Id   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"name"`
+	Id        types.String `tfsdk:"id"`
+	Name      types.String `tfsdk:"name"`
+	Condition types.String `tfsdk:"condition"`
 	// Action type fields
 	ApiAction        *workflowApiActionModel        `tfsdk:"api_action"`
 	ApprovalAction   *workflowApprovalActionModel   `tfsdk:"approval_action"`
+	ConditionAction  *workflowConditionActionModel  `tfsdk:"condition_action"`
 	QueryAction      *workflowQueryActionModel      `tfsdk:"query_action"`
 	SlackAction      *workflowSlackActionModel      `tfsdk:"slack_action"`
 	SlackReplyAction *workflowSlackReplyActionModel `tfsdk:"slack_reply_action"`
@@ -80,6 +83,11 @@ type workflowApiActionHeadersModel struct {
 type workflowApprovalActionModel struct {
 	ReviewsRequired types.Int64        `tfsdk:"reviews_required"`
 	Permissions     []*permissionModel `tfsdk:"permissions"`
+}
+
+type workflowConditionActionModel struct {
+	Condition types.String `tfsdk:"condition"`
+	WhenFalse types.String `tfsdk:"when_false"`
 }
 
 type workflowQueryActionModel struct {
@@ -122,6 +130,10 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the workflow.",
 				Required:            true,
+			},
+			"cron_schedule": schema.StringAttribute{
+				MarkdownDescription: "A cron expression evaluated using UTC time to trigger the workflow (e.g. 0 0 * * *).",
+				Optional:            true,
 			},
 			"trigger_linear_label_name": schema.StringAttribute{
 				MarkdownDescription: "The name of the Linear label that should trigger the workflow.",
@@ -169,12 +181,17 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 							MarkdownDescription: "The name of the step.",
 							Optional:            true,
 						},
+						"condition": schema.StringAttribute{
+							MarkdownDescription: "Expression to evaluate if this step should run, if evaluated as true step will run, otherwise it will be skipped. If no condition is set the step will always run. You can use the input, output from previous steps, and basic operators like ==, !=, >, <, >=, <=, &&, ||, not.",
+							Optional:            true,
+						},
 						"api_action": schema.SingleNestedAttribute{
 							Optional: true,
 							Validators: []validator.Object{
 								objectvalidator.ExactlyOneOf(
 									path.MatchRelative().AtParent().AtName("api_action"),
 									path.MatchRelative().AtParent().AtName("approval_action"),
+									path.MatchRelative().AtParent().AtName("condition_action"),
 									path.MatchRelative().AtParent().AtName("query_action"),
 									path.MatchRelative().AtParent().AtName("slack_action"),
 									path.MatchRelative().AtParent().AtName("slack_reply_action"),
@@ -254,6 +271,19 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 											},
 										},
 									},
+								},
+							},
+						},
+						"condition_action": schema.SingleNestedAttribute{
+							Optional: true,
+							Attributes: map[string]schema.Attribute{
+								"condition": schema.StringAttribute{
+									MarkdownDescription: "Expression to evaluate if workflow should continue, if evaluated as true workflow will continue. You can use the input, output from previous steps, and basic operators like ==, !=, >, <, >=, <=, &&, ||, not.",
+									Required:            true,
+								},
+								"when_false": schema.StringAttribute{
+									MarkdownDescription: "When false, mark workflow as: (failed, succeeded)",
+									Required:            true,
 								},
 							},
 						},
@@ -341,6 +371,10 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 			workflowStep.Name = step.Name.ValueString()
 		}
 
+		if step.Condition.ValueString() != "" {
+			workflowStep.Condition = step.Condition.ValueString()
+		}
+
 		workflowStep.Permissions = make([]*devhub.Permission, 0)
 
 		if step.ApiAction != nil {
@@ -378,6 +412,14 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 			}
 		}
 
+		if step.ConditionAction != nil {
+			workflowStep.Action = &devhub.WorkflowStepAction{
+				Type:      "condition",
+				Condition: step.ConditionAction.Condition.ValueString(),
+				WhenFalse: step.ConditionAction.WhenFalse.ValueString(),
+			}
+		}
+
 		if step.QueryAction != nil {
 			workflowStep.Action = &devhub.WorkflowStepAction{
 				Type:         "query",
@@ -409,6 +451,7 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 
 	input := devhub.Workflow{
 		Name:               plan.Name.ValueString(),
+		CronSchedule:       plan.CronSchedule.ValueString(),
 		TriggerLinearLabel: devhub.TriggerLinearLabel{Name: plan.TriggerLinearLabelName.ValueString()},
 		Inputs:             inputs,
 		Steps:              steps,
@@ -468,6 +511,7 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	state.Id = types.StringValue(workflow.Id)
 	state.Name = types.StringValue(workflow.Name)
+	state.CronSchedule = types.StringValue(workflow.CronSchedule)
 
 	if workflow.TriggerLinearLabel.Name == "" {
 		state.TriggerLinearLabelName = types.StringNull()
@@ -499,6 +543,10 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 		if step.Name != "" {
 			stepModel.Name = types.StringValue(step.Name)
+		}
+
+		if step.Condition != "" {
+			stepModel.Condition = types.StringValue(step.Condition)
 		}
 
 		switch step.Action.Type {
@@ -545,6 +593,12 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 			stepModel.ApprovalAction = &workflowApprovalActionModel{
 				ReviewsRequired: types.Int64Value(int64(step.Action.ReviewsRequired)),
 				Permissions:     permissions,
+			}
+
+		case "condition":
+			stepModel.ConditionAction = &workflowConditionActionModel{
+				Condition: types.StringValue(step.Action.Condition),
+				WhenFalse: types.StringValue(step.Action.WhenFalse),
 			}
 
 		case "query":
@@ -610,6 +664,10 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 			workflowStep.Name = step.Name.ValueString()
 		}
 
+		if step.Condition.ValueString() != "" {
+			workflowStep.Condition = step.Condition.ValueString()
+		}
+
 		workflowStep.Permissions = make([]*devhub.Permission, 0)
 
 		if step.ApiAction != nil {
@@ -652,6 +710,12 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 
 				workflowStep.Permissions = append(workflowStep.Permissions, &permissionModel)
 			}
+		} else if step.ConditionAction != nil {
+			workflowStep.Action = &devhub.WorkflowStepAction{
+				Type:      "condition",
+				Condition: step.ConditionAction.Condition.ValueString(),
+				WhenFalse: step.ConditionAction.WhenFalse.ValueString(),
+			}
 		} else if step.QueryAction != nil {
 			workflowStep.Action = &devhub.WorkflowStepAction{
 				Type:         "query",
@@ -680,6 +744,7 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 	workflow := devhub.Workflow{
 		Id:                 plan.Id.ValueString(),
 		Name:               plan.Name.ValueString(),
+		CronSchedule:       plan.CronSchedule.ValueString(),
 		TriggerLinearLabel: devhub.TriggerLinearLabel{Name: plan.TriggerLinearLabelName.ValueString()},
 		Inputs:             inputs,
 		Steps:              steps,
