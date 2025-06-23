@@ -511,7 +511,12 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	state.Id = types.StringValue(workflow.Id)
 	state.Name = types.StringValue(workflow.Name)
-	state.CronSchedule = types.StringValue(workflow.CronSchedule)
+
+	if workflow.CronSchedule != "" {
+		state.CronSchedule = types.StringValue(workflow.CronSchedule)
+	} else {
+		state.CronSchedule = types.StringNull()
+	}
 
 	if workflow.TriggerLinearLabel.Name == "" {
 		state.TriggerLinearLabelName = types.StringNull()
