@@ -209,11 +209,17 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		})
 	}
 
+	var port *int64
+	if !plan.Port.IsNull() {
+		portValue := plan.Port.ValueInt64()
+		port = &portValue
+	}
+
 	input := devhub.Database{
 		Name:           plan.Name.ValueString(),
 		Adapter:        strings.ToLower(plan.Adapter.ValueString()),
 		Hostname:       plan.Hostname.ValueString(),
-		Port:           plan.Port.ValueInt64(),
+		Port:           port,
 		Database:       plan.Database.ValueString(),
 		Ssl:            plan.Ssl.ValueBool(),
 		Cacertfile:     plan.Cacertfile.ValueString(),
@@ -293,8 +299,8 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.SlackChannel = types.StringNull()
 	state.AgentId = types.StringNull()
 
-	if database.Port != 0 {
-		state.Port = types.Int64Value(database.Port)
+	if database.Port != nil {
+		state.Port = types.Int64Value(*database.Port)
 	}
 
 	if database.Group != "" {
@@ -361,11 +367,17 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		})
 	}
 
+	var port *int64
+	if !plan.Port.IsNull() {
+		portValue := plan.Port.ValueInt64()
+		port = &portValue
+	}
+
 	input := devhub.Database{
 		Name:           plan.Name.ValueString(),
 		Adapter:        strings.ToLower(plan.Adapter.ValueString()),
 		Hostname:       plan.Hostname.ValueString(),
-		Port:           plan.Port.ValueInt64(),
+		Port:           port,
 		Database:       plan.Database.ValueString(),
 		Ssl:            plan.Ssl.ValueBool(),
 		Cacertfile:     plan.Cacertfile.ValueString(),

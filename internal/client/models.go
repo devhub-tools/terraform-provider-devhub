@@ -5,7 +5,7 @@ type Database struct {
 	Name           string               `json:"name"`
 	Adapter        string               `json:"adapter"`
 	Hostname       string               `json:"hostname"`
-	Port           int64                `json:"port"`
+	Port           *int64               `json:"port"`
 	Database       string               `json:"database"`
 	Ssl            bool                 `json:"ssl"`
 	Cacertfile     string               `json:"cacertfile"`
