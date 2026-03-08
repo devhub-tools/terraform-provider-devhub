@@ -124,15 +124,15 @@ func TestAccWorkflowResourceNoInputs(t *testing.T) {
 			{
 				Config: testAccWorkflowResourceConfigNoInputs(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("devhub_workflow.no_inputs", "name", name + "_no_inputs"),
-					resource.TestCheckResourceAttr("devhub_workflow.empty_inputs", "name", name + "_empty_inputs"),
+					resource.TestCheckResourceAttr("devhub_workflow.no_inputs", "name", name+"_no_inputs"),
+					resource.TestCheckResourceAttr("devhub_workflow.empty_inputs", "name", name+"_empty_inputs"),
 				),
 			},
 			{
 				Config: testAccWorkflowResourceConfigNoInputs(name + "_updated"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("devhub_workflow.no_inputs", "name", name + "_updated_no_inputs"),
-					resource.TestCheckResourceAttr("devhub_workflow.empty_inputs", "name", name + "_updated_empty_inputs"),
+					resource.TestCheckResourceAttr("devhub_workflow.no_inputs", "name", name+"_updated_no_inputs"),
+					resource.TestCheckResourceAttr("devhub_workflow.empty_inputs", "name", name+"_updated_empty_inputs"),
 				),
 			},
 		},
@@ -254,5 +254,5 @@ resource "devhub_workflow" "empty_inputs" {
 		}
 	]
 }
-`, name + "_no_inputs", name + "_empty_inputs")
+`, name+"_no_inputs", name+"_empty_inputs")
 }
