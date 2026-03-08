@@ -71,6 +71,7 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "name", name+"_updated"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.key", "user_id"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.type", "string"),
+					resource.TestCheckResourceAttr("devhub_workflow.test", "inputs.0.required", "false"),
 
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.name", "approval-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.0.approval_action.reviews_required", "1"),
@@ -110,6 +111,30 @@ func TestAccWorkflowResource(t *testing.T) {
 				),
 			},
 			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestAccWorkflowResourceNoInputs(t *testing.T) {
+	name := fmt.Sprintf("workflow_%s", acctest.RandString(10))
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: testAccWorkflowResourceConfigNoInputs(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_workflow.no_inputs", "name", name + "_no_inputs"),
+					resource.TestCheckResourceAttr("devhub_workflow.empty_inputs", "name", name + "_empty_inputs"),
+				),
+			},
+			{
+				Config: testAccWorkflowResourceConfigNoInputs(name + "_updated"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_workflow.no_inputs", "name", name + "_updated_no_inputs"),
+					resource.TestCheckResourceAttr("devhub_workflow.empty_inputs", "name", name + "_updated_empty_inputs"),
+				),
+			},
 		},
 	})
 }
@@ -197,4 +222,37 @@ resource "devhub_workflow" "test" {
 	]
 }
 `, name)
+}
+
+func testAccWorkflowResourceConfigNoInputs(name string) string {
+	return providerConfig + fmt.Sprintf(`
+resource "devhub_workflow" "no_inputs" {
+  name          = %[1]q
+
+  steps = [
+		{
+			name = "condition-step"
+			condition_action = {
+				condition = "true"
+				when_false = "succeeded"
+			}
+		}
+	]
+}
+resource "devhub_workflow" "empty_inputs" {
+  name          = %[2]q
+
+	inputs = []
+
+  steps = [
+		{
+			name = "condition-step"
+			condition_action = {
+				condition = "true"
+				when_false = "succeeded"
+			}
+		}
+	]
+}
+`, name + "_no_inputs", name + "_empty_inputs")
 }
