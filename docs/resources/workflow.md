@@ -96,6 +96,7 @@ resource "devhub_workflow" "example" {
 ### Optional
 
 - `cron_schedule` (String) A cron expression evaluated using UTC time to trigger the workflow (e.g. 0 0 * * *).
+- `group` (String) Used to organize workflows into folders in the workflow list.
 - `inputs` (Attributes List) (see [below for nested schema](#nestedatt--inputs))
 - `trigger_linear_label_name` (String) The name of the Linear label that should trigger the workflow.
 
@@ -225,3 +226,4 @@ Required:
 Optional:
 
 - `description` (String) A description of what this input is for.
+- `required` (Boolean) Whether this input is required.
