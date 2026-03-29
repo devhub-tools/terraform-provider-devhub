@@ -86,7 +86,7 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required:            true,
 			},
 			"adapter": schema.StringAttribute{
-				MarkdownDescription: "The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL` and `CLICKHOUSE` are supported.",
+				MarkdownDescription: "The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL`, `CLICKHOUSE`, `SQLSERVER`, and `ORACLE` are supported.",
 				Required:            true,
 			},
 			"port": schema.Int64Attribute{
