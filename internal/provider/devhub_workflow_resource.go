@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -35,6 +36,7 @@ type workflowResourceModel struct {
 	Id                     types.String         `tfsdk:"id"`
 	Name                   types.String         `tfsdk:"name"`
 	CronSchedule           types.String         `tfsdk:"cron_schedule"`
+	Group                  types.String         `tfsdk:"group"`
 	TriggerLinearLabelName types.String         `tfsdk:"trigger_linear_label_name"`
 	Inputs                 []workflowInputModel `tfsdk:"inputs"`
 	Steps                  []workflowStepModel  `tfsdk:"steps"`
@@ -44,10 +46,10 @@ type workflowInputModel struct {
 	Key         types.String `tfsdk:"key"`
 	Description types.String `tfsdk:"description"`
 	Type        types.String `tfsdk:"type"`
+	Required    types.Bool   `tfsdk:"required"`
 }
 
 type workflowStepModel struct {
-	Id        types.String `tfsdk:"id"`
 	Name      types.String `tfsdk:"name"`
 	Condition types.String `tfsdk:"condition"`
 	// Action type fields
@@ -135,6 +137,10 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				MarkdownDescription: "A cron expression evaluated using UTC time to trigger the workflow (e.g. 0 0 * * *).",
 				Optional:            true,
 			},
+			"group": schema.StringAttribute{
+				MarkdownDescription: "Used to organize workflows into folders in the workflow list.",
+				Optional:            true,
+			},
 			"trigger_linear_label_name": schema.StringAttribute{
 				MarkdownDescription: "The name of the Linear label that should trigger the workflow.",
 				Optional:            true,
@@ -163,6 +169,12 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 								),
 							},
 						},
+						"required": schema.BoolAttribute{
+							MarkdownDescription: "Whether this input is required.",
+							Optional:            true,
+							Computed:            true,
+							Default:             booldefault.StaticBool(false),
+						},
 					},
 				},
 			},
@@ -170,13 +182,6 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							Computed:            true,
-							MarkdownDescription: "Step id.",
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
 						"name": schema.StringAttribute{
 							MarkdownDescription: "The name of the step.",
 							Optional:            true,
@@ -349,11 +354,12 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	var inputs []devhub.WorkflowInput
+	inputs := make([]devhub.WorkflowInput, 0)
 	for _, planInput := range plan.Inputs {
 		input := devhub.WorkflowInput{
-			Key:  planInput.Key.ValueString(),
-			Type: planInput.Type.ValueString(),
+			Key:      planInput.Key.ValueString(),
+			Type:     planInput.Type.ValueString(),
+			Required: planInput.Required.ValueBool(),
 		}
 
 		if planInput.Description.ValueString() != "" {
@@ -452,6 +458,7 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 	input := devhub.Workflow{
 		Name:               plan.Name.ValueString(),
 		CronSchedule:       plan.CronSchedule.ValueString(),
+		Group:              plan.Group.ValueString(),
 		TriggerLinearLabel: devhub.TriggerLinearLabel{Name: plan.TriggerLinearLabelName.ValueString()},
 		Inputs:             inputs,
 		Steps:              steps,
@@ -470,8 +477,6 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 	plan.Id = types.StringValue(createdWorkflow.Id)
 
 	for index, step := range createdWorkflow.Steps {
-		plan.Steps[index].Id = types.StringValue(step.Id)
-
 		if step.Action.Type == "approval" {
 			for permissionIndex, permission := range step.Permissions {
 				plan.Steps[index].ApprovalAction.Permissions[permissionIndex].Id = types.StringValue(permission.Id)
@@ -518,6 +523,12 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.CronSchedule = types.StringNull()
 	}
 
+	if workflow.Group != "" {
+		state.Group = types.StringValue(workflow.Group)
+	} else {
+		state.Group = types.StringNull()
+	}
+
 	if workflow.TriggerLinearLabel.Name == "" {
 		state.TriggerLinearLabelName = types.StringNull()
 	} else {
@@ -525,10 +536,14 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	var stateInputs []workflowInputModel
+	if state.Inputs != nil {
+		stateInputs = make([]workflowInputModel, 0)
+	}
 	for _, stateInput := range workflow.Inputs {
 		input := workflowInputModel{
-			Key:  types.StringValue(stateInput.Key),
-			Type: types.StringValue(stateInput.Type),
+			Key:      types.StringValue(stateInput.Key),
+			Type:     types.StringValue(stateInput.Type),
+			Required: types.BoolValue(stateInput.Required),
 		}
 
 		if stateInput.Description != "" {
@@ -542,9 +557,7 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	var stateSteps []workflowStepModel
 	for _, step := range workflow.Steps {
-		stepModel := workflowStepModel{
-			Id: types.StringValue(step.Id),
-		}
+		stepModel := workflowStepModel{}
 
 		if step.Name != "" {
 			stepModel.Name = types.StringValue(step.Name)
@@ -645,11 +658,12 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	var inputs []devhub.WorkflowInput
+	inputs := make([]devhub.WorkflowInput, 0)
 	for _, planInput := range plan.Inputs {
 		input := devhub.WorkflowInput{
-			Key:  planInput.Key.ValueString(),
-			Type: planInput.Type.ValueString(),
+			Key:      planInput.Key.ValueString(),
+			Type:     planInput.Type.ValueString(),
+			Required: planInput.Required.ValueBool(),
 		}
 
 		if planInput.Description.ValueString() != "" {
@@ -661,9 +675,7 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 
 	var steps []devhub.WorkflowStep
 	for _, step := range plan.Steps {
-		workflowStep := devhub.WorkflowStep{
-			Id: step.Id.ValueString(),
-		}
+		workflowStep := devhub.WorkflowStep{}
 
 		if step.Name.ValueString() != "" {
 			workflowStep.Name = step.Name.ValueString()
@@ -750,6 +762,7 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 		Id:                 plan.Id.ValueString(),
 		Name:               plan.Name.ValueString(),
 		CronSchedule:       plan.CronSchedule.ValueString(),
+		Group:              plan.Group.ValueString(),
 		TriggerLinearLabel: devhub.TriggerLinearLabel{Name: plan.TriggerLinearLabelName.ValueString()},
 		Inputs:             inputs,
 		Steps:              steps,
@@ -765,8 +778,6 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	for index, step := range updatedWorkflow.Steps {
-		plan.Steps[index].Id = types.StringValue(step.Id)
-
 		if step.Action.Type == "approval" {
 			for permissionIndex, permission := range step.Permissions {
 				plan.Steps[index].ApprovalAction.Permissions[permissionIndex].Id = types.StringValue(permission.Id)

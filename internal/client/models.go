@@ -66,6 +66,7 @@ type Workflow struct {
 	Id                 string             `json:"id"`
 	Name               string             `json:"name"`
 	CronSchedule       string             `json:"cron_schedule"`
+	Group              string             `json:"group"`
 	TriggerLinearLabel TriggerLinearLabel `json:"trigger_linear_label"`
 	Inputs             []WorkflowInput    `json:"inputs"`
 	Steps              []WorkflowStep     `json:"steps"`
@@ -79,10 +80,10 @@ type WorkflowInput struct {
 	Key         string `json:"key"`
 	Description string `json:"description"`
 	Type        string `json:"type"` // string, float, integer, boolean
+	Required    bool   `json:"required"`
 }
 
 type WorkflowStep struct {
-	Id        string `json:"id"`
 	Name      string `json:"name"`
 	Condition string `json:"condition"`
 	// Action fields
