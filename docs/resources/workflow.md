@@ -118,10 +118,6 @@ Optional:
 - `slack_action` (Attributes) (see [below for nested schema](#nestedatt--steps--slack_action))
 - `slack_reply_action` (Attributes) (see [below for nested schema](#nestedatt--steps--slack_reply_action))
 
-Read-Only:
-
-- `id` (String) Step id.
-
 <a id="nestedatt--steps--api_action"></a>
 ### Nested Schema for `steps.api_action`
 

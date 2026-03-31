@@ -84,7 +84,6 @@ type WorkflowInput struct {
 }
 
 type WorkflowStep struct {
-	Id        string `json:"id"`
 	Name      string `json:"name"`
 	Condition string `json:"condition"`
 	// Action fields

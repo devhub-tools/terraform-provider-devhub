@@ -50,12 +50,6 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.5.slack_reply_action.message", "Hello, world!"),
 
 					resource.TestCheckResourceAttrSet("devhub_workflow.test", "id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.0.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.1.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.2.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.3.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.4.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.5.id"),
 				),
 			},
 			// ImportState testing
@@ -102,12 +96,6 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.5.slack_reply_action.message", "Hello, world!"),
 
 					resource.TestCheckResourceAttrSet("devhub_workflow.test", "id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.0.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.1.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.2.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.3.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.4.id"),
-					resource.TestCheckResourceAttrSet("devhub_workflow.test", "steps.5.id"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
