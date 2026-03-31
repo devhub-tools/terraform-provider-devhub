@@ -50,7 +50,6 @@ type workflowInputModel struct {
 }
 
 type workflowStepModel struct {
-	Id        types.String `tfsdk:"id"`
 	Name      types.String `tfsdk:"name"`
 	Condition types.String `tfsdk:"condition"`
 	// Action type fields
@@ -183,13 +182,6 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							Computed:            true,
-							MarkdownDescription: "Step id.",
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.UseStateForUnknown(),
-							},
-						},
 						"name": schema.StringAttribute{
 							MarkdownDescription: "The name of the step.",
 							Optional:            true,
@@ -485,8 +477,6 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 	plan.Id = types.StringValue(createdWorkflow.Id)
 
 	for index, step := range createdWorkflow.Steps {
-		plan.Steps[index].Id = types.StringValue(step.Id)
-
 		if step.Action.Type == "approval" {
 			for permissionIndex, permission := range step.Permissions {
 				plan.Steps[index].ApprovalAction.Permissions[permissionIndex].Id = types.StringValue(permission.Id)
@@ -567,9 +557,7 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	var stateSteps []workflowStepModel
 	for _, step := range workflow.Steps {
-		stepModel := workflowStepModel{
-			Id: types.StringValue(step.Id),
-		}
+		stepModel := workflowStepModel{}
 
 		if step.Name != "" {
 			stepModel.Name = types.StringValue(step.Name)
@@ -687,9 +675,7 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 
 	var steps []devhub.WorkflowStep
 	for _, step := range plan.Steps {
-		workflowStep := devhub.WorkflowStep{
-			Id: step.Id.ValueString(),
-		}
+		workflowStep := devhub.WorkflowStep{}
 
 		if step.Name.ValueString() != "" {
 			workflowStep.Name = step.Name.ValueString()
@@ -792,8 +778,6 @@ func (r *workflowResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	for index, step := range updatedWorkflow.Steps {
-		plan.Steps[index].Id = types.StringValue(step.Id)
-
 		if step.Action.Type == "approval" {
 			for permissionIndex, permission := range step.Permissions {
 				plan.Steps[index].ApprovalAction.Permissions[permissionIndex].Id = types.StringValue(permission.Id)
