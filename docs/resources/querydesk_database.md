@@ -14,10 +14,12 @@ Database resource
 
 ```terraform
 resource "devhub_querydesk_database" "example" {
-  name     = "terraform_test"
-  adapter  = "POSTGRES"
-  hostname = "localhost"
-  database = "mydb"
+  name        = "terraform_test"
+  adapter     = "POSTGRES"
+  hostname    = "localhost"
+  database    = "mydb"
+  ai_enabled  = true
+  ai_max_rows = 500
 
   credentials = [
     {
@@ -25,6 +27,8 @@ resource "devhub_querydesk_database" "example" {
       password           = "postgres"
       reviews_required   = 0
       default_credential = true
+      ai_allowed         = true
+      timeout            = 30
     }
   ]
 }
@@ -44,6 +48,8 @@ resource "devhub_querydesk_database" "example" {
 ### Optional
 
 - `agent_id` (String) The agent id for the database.
+- `ai_enabled` (Boolean) Whether the AI agent may see and query this database. Opt-in, defaults to `false`.
+- `ai_max_rows` (Number) The maximum number of rows a single AI query may return against this database.
 - `cacertfile` (String, Sensitive) The server ca cert to use with ssl connections, `ssl` must be set to `true`.
 - `certfile` (String, Sensitive) The client cert to use with ssl connections, `ssl` must be set to `true`.
 - `group` (String) The group this database belongs to, used for UI grouping.
@@ -69,8 +75,10 @@ Required:
 
 Optional:
 
+- `ai_allowed` (Boolean) Whether the AI agent is permitted to connect with this credential. Defaults to `false`.
 - `default_credential` (Boolean) Whether this is the default credential for the database.
 - `hostname` (String) The hostname to use for connecting to the database when using this credential (overrides the default hostname).
+- `timeout` (Number) The number of seconds before an AI query using this credential is cancelled. Unset means no per-credential timeout.
 
 Read-Only:
 

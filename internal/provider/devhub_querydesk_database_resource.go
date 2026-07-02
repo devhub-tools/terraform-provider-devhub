@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -47,6 +48,8 @@ type databaseResourceModel struct {
 	Group          types.String              `tfsdk:"group"`
 	SlackChannel   types.String              `tfsdk:"slack_channel"`
 	AgentId        types.String              `tfsdk:"agent_id"`
+	AiEnabled      types.Bool                `tfsdk:"ai_enabled"`
+	AiMaxRows      types.Int64               `tfsdk:"ai_max_rows"`
 	Credentials    []databaseCredentialModel `tfsdk:"credentials"`
 	CredentialIds  types.Map                 `tfsdk:"credential_ids"`
 }
@@ -58,6 +61,8 @@ type databaseCredentialModel struct {
 	Hostname          types.String `tfsdk:"hostname"`
 	ReviewsRequired   types.Int64  `tfsdk:"reviews_required"`
 	DefaultCredential types.Bool   `tfsdk:"default_credential"`
+	AiAllowed         types.Bool   `tfsdk:"ai_allowed"`
+	Timeout           types.Int64  `tfsdk:"timeout"`
 }
 
 type databaseResource struct {
@@ -140,6 +145,18 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				MarkdownDescription: "The agent id for the database.",
 				Optional:            true,
 			},
+			"ai_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether the AI agent may see and query this database. Opt-in, defaults to `false`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"ai_max_rows": schema.Int64Attribute{
+				MarkdownDescription: "The maximum number of rows a single AI query may return against this database.",
+				Optional:            true,
+				Computed:            true,
+				Default:             int64default.StaticInt64(500),
+			},
 			"credential_ids": schema.MapAttribute{
 				ElementType:         types.StringType,
 				Computed:            true,
@@ -182,6 +199,16 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 							Computed:            true,
 							Default:             booldefault.StaticBool(false),
 						},
+						"ai_allowed": schema.BoolAttribute{
+							MarkdownDescription: "Whether the AI agent is permitted to connect with this credential. Defaults to `false`.",
+							Optional:            true,
+							Computed:            true,
+							Default:             booldefault.StaticBool(false),
+						},
+						"timeout": schema.Int64Attribute{
+							MarkdownDescription: "The number of seconds before an AI query using this credential is cancelled. Unset means no per-credential timeout.",
+							Optional:            true,
+						},
 					},
 				},
 			},
@@ -200,12 +227,20 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 
 	var credentials []devhub.DatabaseCredential
 	for _, credential := range plan.Credentials {
+		var timeout *int64
+		if !credential.Timeout.IsNull() {
+			timeoutValue := credential.Timeout.ValueInt64()
+			timeout = &timeoutValue
+		}
+
 		credentials = append(credentials, devhub.DatabaseCredential{
 			Username:          credential.Username.ValueString(),
 			Password:          credential.Password.ValueString(),
 			Hostname:          credential.Hostname.ValueString(),
 			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
 			DefaultCredential: credential.DefaultCredential.ValueBool(),
+			AiAllowed:         credential.AiAllowed.ValueBool(),
+			Timeout:           timeout,
 		})
 	}
 
@@ -229,6 +264,8 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		Group:          plan.Group.ValueString(),
 		SlackChannel:   plan.SlackChannel.ValueString(),
 		AgentId:        plan.AgentId.ValueString(),
+		AiEnabled:      plan.AiEnabled.ValueBool(),
+		AiMaxRows:      plan.AiMaxRows.ValueInt64(),
 		Credentials:    credentials,
 	}
 
@@ -249,6 +286,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 	for index, credential := range database.Credentials {
 		plan.Credentials[index].Id = types.StringValue(credential.Id)
 		plan.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
+		plan.Credentials[index].AiAllowed = types.BoolValue(credential.AiAllowed)
 
 		credentialIds[credential.Username] = types.StringValue(credential.Id)
 	}
@@ -293,6 +331,8 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Database = types.StringValue(database.Database)
 	state.Ssl = types.BoolValue(database.Ssl)
 	state.RestrictAccess = types.BoolValue(database.RestrictAccess)
+	state.AiEnabled = types.BoolValue(database.AiEnabled)
+	state.AiMaxRows = types.Int64Value(database.AiMaxRows)
 
 	state.Port = types.Int64Null()
 	state.Group = types.StringNull()
@@ -326,11 +366,18 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.Credentials[index].Username = types.StringValue(credential.Username)
 		state.Credentials[index].ReviewsRequired = types.Int64Value(int64(credential.ReviewsRequired))
 		state.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
+		state.Credentials[index].AiAllowed = types.BoolValue(credential.AiAllowed)
 
 		state.Credentials[index].Hostname = types.StringNull()
 
 		if credential.Hostname != "" {
 			state.Credentials[index].Hostname = types.StringValue(credential.Hostname)
+		}
+
+		state.Credentials[index].Timeout = types.Int64Null()
+
+		if credential.Timeout != nil {
+			state.Credentials[index].Timeout = types.Int64Value(*credential.Timeout)
 		}
 
 		credentialIds[credential.Username] = types.StringValue(credential.Id)
@@ -357,6 +404,12 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 
 	var credentials []devhub.DatabaseCredential
 	for _, credential := range plan.Credentials {
+		var timeout *int64
+		if !credential.Timeout.IsNull() {
+			timeoutValue := credential.Timeout.ValueInt64()
+			timeout = &timeoutValue
+		}
+
 		credentials = append(credentials, devhub.DatabaseCredential{
 			Id:                credential.Id.ValueString(),
 			Username:          credential.Username.ValueString(),
@@ -364,6 +417,8 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 			Hostname:          credential.Hostname.ValueString(),
 			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
 			DefaultCredential: credential.DefaultCredential.ValueBool(),
+			AiAllowed:         credential.AiAllowed.ValueBool(),
+			Timeout:           timeout,
 		})
 	}
 
@@ -387,6 +442,8 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		Group:          plan.Group.ValueString(),
 		SlackChannel:   plan.SlackChannel.ValueString(),
 		AgentId:        plan.AgentId.ValueString(),
+		AiEnabled:      plan.AiEnabled.ValueBool(),
+		AiMaxRows:      plan.AiMaxRows.ValueInt64(),
 		Credentials:    credentials,
 	}
 
