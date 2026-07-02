@@ -216,6 +216,74 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 	}
 }
 
+// hydrateModelFromDatabase maps the server-returned database onto the model,
+// overwriting every server-owned attribute (including the AI configuration and
+// per-credential fields) so Terraform state reflects the API response. Fields the
+// API never returns (credential passwords, TLS material) are left untouched on the
+// model, so they must already be populated (e.g. from the plan) before calling.
+func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Database) {
+	model.Id = types.StringValue(database.Id)
+	model.Name = types.StringValue(database.Name)
+	model.Adapter = types.StringValue(strings.ToUpper(database.Adapter))
+	model.Hostname = types.StringValue(database.Hostname)
+	model.Database = types.StringValue(database.Database)
+	model.Ssl = types.BoolValue(database.Ssl)
+	model.RestrictAccess = types.BoolValue(database.RestrictAccess)
+	model.AiEnabled = types.BoolValue(database.AiEnabled)
+	model.AiMaxRows = types.Int64Value(database.AiMaxRows)
+
+	model.Port = types.Int64Null()
+	model.Group = types.StringNull()
+	model.SlackChannel = types.StringNull()
+	model.AgentId = types.StringNull()
+
+	if database.Port != nil {
+		model.Port = types.Int64Value(*database.Port)
+	}
+
+	if database.Group != "" {
+		model.Group = types.StringValue(database.Group)
+	}
+
+	if database.SlackChannel != "" {
+		model.SlackChannel = types.StringValue(database.SlackChannel)
+	}
+
+	if database.AgentId != "" {
+		model.AgentId = types.StringValue(database.AgentId)
+	}
+
+	if model.Credentials == nil || len(model.Credentials) != len(database.Credentials) {
+		model.Credentials = make([]databaseCredentialModel, len(database.Credentials))
+	}
+
+	credentialIds := make(map[string]attr.Value)
+
+	for index, credential := range database.Credentials {
+		model.Credentials[index].Id = types.StringValue(credential.Id)
+		model.Credentials[index].Username = types.StringValue(credential.Username)
+		model.Credentials[index].ReviewsRequired = types.Int64Value(int64(credential.ReviewsRequired))
+		model.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
+		model.Credentials[index].AiAllowed = types.BoolValue(credential.AiAllowed)
+
+		model.Credentials[index].Hostname = types.StringNull()
+
+		if credential.Hostname != "" {
+			model.Credentials[index].Hostname = types.StringValue(credential.Hostname)
+		}
+
+		model.Credentials[index].Timeout = types.Int64Null()
+
+		if credential.Timeout != nil {
+			model.Credentials[index].Timeout = types.Int64Value(*credential.Timeout)
+		}
+
+		credentialIds[credential.Username] = types.StringValue(credential.Id)
+	}
+
+	model.CredentialIds = types.MapValueMust(types.StringType, credentialIds)
+}
+
 func (r *databaseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
 	var plan databaseResourceModel
@@ -279,19 +347,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	plan.Id = types.StringValue(database.Id)
-
-	credentialIds := make(map[string]attr.Value)
-
-	for index, credential := range database.Credentials {
-		plan.Credentials[index].Id = types.StringValue(credential.Id)
-		plan.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
-		plan.Credentials[index].AiAllowed = types.BoolValue(credential.AiAllowed)
-
-		credentialIds[credential.Username] = types.StringValue(credential.Id)
-	}
-
-	plan.CredentialIds = types.MapValueMust(types.StringType, credentialIds)
+	hydrateModelFromDatabase(&plan, database)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -325,65 +381,7 @@ func (r *databaseResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	state.Name = types.StringValue(database.Name)
-	state.Adapter = types.StringValue(strings.ToUpper(database.Adapter))
-	state.Hostname = types.StringValue(database.Hostname)
-	state.Database = types.StringValue(database.Database)
-	state.Ssl = types.BoolValue(database.Ssl)
-	state.RestrictAccess = types.BoolValue(database.RestrictAccess)
-	state.AiEnabled = types.BoolValue(database.AiEnabled)
-	state.AiMaxRows = types.Int64Value(database.AiMaxRows)
-
-	state.Port = types.Int64Null()
-	state.Group = types.StringNull()
-	state.SlackChannel = types.StringNull()
-	state.AgentId = types.StringNull()
-
-	if database.Port != nil {
-		state.Port = types.Int64Value(*database.Port)
-	}
-
-	if database.Group != "" {
-		state.Group = types.StringValue(database.Group)
-	}
-
-	if database.SlackChannel != "" {
-		state.SlackChannel = types.StringValue(database.SlackChannel)
-	}
-
-	if database.AgentId != "" {
-		state.AgentId = types.StringValue(database.AgentId)
-	}
-
-	if state.Credentials == nil || len(state.Credentials) != len(database.Credentials) {
-		state.Credentials = make([]databaseCredentialModel, len(database.Credentials))
-	}
-
-	credentialIds := make(map[string]attr.Value)
-
-	for index, credential := range database.Credentials {
-		state.Credentials[index].Id = types.StringValue(credential.Id)
-		state.Credentials[index].Username = types.StringValue(credential.Username)
-		state.Credentials[index].ReviewsRequired = types.Int64Value(int64(credential.ReviewsRequired))
-		state.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
-		state.Credentials[index].AiAllowed = types.BoolValue(credential.AiAllowed)
-
-		state.Credentials[index].Hostname = types.StringNull()
-
-		if credential.Hostname != "" {
-			state.Credentials[index].Hostname = types.StringValue(credential.Hostname)
-		}
-
-		state.Credentials[index].Timeout = types.Int64Null()
-
-		if credential.Timeout != nil {
-			state.Credentials[index].Timeout = types.Int64Value(*credential.Timeout)
-		}
-
-		credentialIds[credential.Username] = types.StringValue(credential.Id)
-	}
-
-	state.CredentialIds = types.MapValueMust(types.StringType, credentialIds)
+	hydrateModelFromDatabase(&state, database)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -457,15 +455,7 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	credentialIds := make(map[string]attr.Value)
-
-	for index, credential := range database.Credentials {
-		plan.Credentials[index].Id = types.StringValue(credential.Id)
-
-		credentialIds[credential.Username] = types.StringValue(credential.Id)
-	}
-
-	plan.CredentialIds = types.MapValueMust(types.StringType, credentialIds)
+	hydrateModelFromDatabase(&plan, database)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
