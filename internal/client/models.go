@@ -15,6 +15,8 @@ type Database struct {
 	Group          string               `json:"group"`
 	SlackChannel   string               `json:"slack_channel"`
 	AgentId        string               `json:"agent_id"`
+	AiEnabled      bool                 `json:"ai_enabled"`
+	AiMaxRows      int64                `json:"ai_max_rows"`
 	Credentials    []DatabaseCredential `json:"credentials"`
 }
 
@@ -25,6 +27,8 @@ type DatabaseCredential struct {
 	Hostname          string `json:"hostname"`
 	ReviewsRequired   int    `json:"reviews_required"`
 	DefaultCredential bool   `json:"default_credential"`
+	AiAllowed         bool   `json:"ai_allowed"`
+	Timeout           *int64 `json:"timeout"`
 }
 
 type TerradeskWorkspace struct {
