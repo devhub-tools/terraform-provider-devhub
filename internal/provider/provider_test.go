@@ -4,18 +4,18 @@
 package provider
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-const (
-	providerConfig = `
+var providerConfig = fmt.Sprintf(`
 provider "devhub" {
-	host    = "http://localhost:4000"
-	api_key = "test"
+	host = %q
 }
-`
-)
+`, os.Getenv("DEVHUB_HOST"))
 
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
 	"devhub": providerserver.NewProtocol6WithError(New("test")()),
