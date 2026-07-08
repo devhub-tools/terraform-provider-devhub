@@ -79,11 +79,11 @@ func (p *devhubProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	host := os.Getenv("DEVHUB_HOST")
 	api_key := os.Getenv("DEVHUB_API_KEY")
 
-	if host == "" {
+	if config.Host.ValueString() != "" {
 		host = config.Host.ValueString()
 	}
 
-	if api_key == "" {
+	if config.ApiKey.ValueString() != "" {
 		api_key = config.ApiKey.ValueString()
 	}
 
