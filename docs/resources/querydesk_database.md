@@ -77,7 +77,6 @@ Optional:
 
 - `ai_allowed` (Boolean) Whether the AI agent is permitted to connect with this credential. Defaults to `false`.
 - `default_credential` (Boolean) Whether this is the default credential for the database.
-- `hostname` (String) The hostname to use for connecting to the database when using this credential (overrides the default hostname).
 - `timeout` (Number) The number of seconds before an AI query using this credential is cancelled. Unset means no per-credential timeout.
 
 Read-Only:

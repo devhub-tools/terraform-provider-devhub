@@ -58,7 +58,6 @@ type databaseCredentialModel struct {
 	Id                types.String `tfsdk:"id"`
 	Username          types.String `tfsdk:"username"`
 	Password          types.String `tfsdk:"password"`
-	Hostname          types.String `tfsdk:"hostname"`
 	ReviewsRequired   types.Int64  `tfsdk:"reviews_required"`
 	DefaultCredential types.Bool   `tfsdk:"default_credential"`
 	AiAllowed         types.Bool   `tfsdk:"ai_allowed"`
@@ -185,10 +184,6 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 							Required:            true,
 							Sensitive:           true,
 						},
-						"hostname": schema.StringAttribute{
-							MarkdownDescription: "The hostname to use for connecting to the database when using this credential (overrides the default hostname).",
-							Optional:            true,
-						},
 						"reviews_required": schema.Int64Attribute{
 							MarkdownDescription: "The number of reviews required before a query can be executed.",
 							Required:            true,
@@ -266,12 +261,6 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 		model.Credentials[index].DefaultCredential = types.BoolValue(credential.DefaultCredential)
 		model.Credentials[index].AiAllowed = types.BoolValue(credential.AiAllowed)
 
-		model.Credentials[index].Hostname = types.StringNull()
-
-		if credential.Hostname != "" {
-			model.Credentials[index].Hostname = types.StringValue(credential.Hostname)
-		}
-
 		model.Credentials[index].Timeout = types.Int64Null()
 
 		if credential.Timeout != nil {
@@ -304,7 +293,6 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		credentials = append(credentials, devhub.DatabaseCredential{
 			Username:          credential.Username.ValueString(),
 			Password:          credential.Password.ValueString(),
-			Hostname:          credential.Hostname.ValueString(),
 			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
 			DefaultCredential: credential.DefaultCredential.ValueBool(),
 			AiAllowed:         credential.AiAllowed.ValueBool(),
@@ -412,7 +400,6 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 			Id:                credential.Id.ValueString(),
 			Username:          credential.Username.ValueString(),
 			Password:          credential.Password.ValueString(),
-			Hostname:          credential.Hostname.ValueString(),
 			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
 			DefaultCredential: credential.DefaultCredential.ValueBool(),
 			AiAllowed:         credential.AiAllowed.ValueBool(),

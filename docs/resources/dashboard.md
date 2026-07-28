@@ -24,15 +24,35 @@ resource "devhub_dashboard" "example" {
         {
           key         = "user_id"
           description = "User ID"
-          type        = "string"
         }
       ]
 
       query_details = {
         query         = "SELECT * FROM users WHERE id = '$${user_id}'"
         credential_id = "crd_xxx"
-        timeout       = 10
       }
+
+      actions = [
+        {
+          label       = "Disable user"
+          workflow_id = "wf_xxx"
+
+          # One mapping per input of the workflow being triggered. Either pull
+          # the value from a column of the clicked row, or prompt the user for
+          # it when they click the button.
+          input_mappings = [
+            {
+              workflow_input_key = "user_id"
+              column             = "id"
+            },
+            {
+              workflow_input_key = "reason"
+              prompt_user        = true
+              prompt             = "Why are you disabling this user?"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
@@ -63,12 +83,44 @@ Required:
 
 Optional:
 
+- `actions` (Attributes List) Row actions that trigger a workflow when the user clicks the button on a row. (see [below for nested schema](#nestedatt--panels--actions))
 - `inputs` (Attributes List) (see [below for nested schema](#nestedatt--panels--inputs))
 - `query_details` (Attributes) (see [below for nested schema](#nestedatt--panels--query_details))
 
 Read-Only:
 
 - `id` (String) Panel id.
+
+<a id="nestedatt--panels--actions"></a>
+### Nested Schema for `panels.actions`
+
+Required:
+
+- `label` (String) Button label shown to the user.
+- `workflow_id` (String) ID of the workflow to trigger when the button is clicked.
+
+Optional:
+
+- `input_mappings` (Attributes List) One entry per workflow input: either map a row column value or prompt the user at run time. (see [below for nested schema](#nestedatt--panels--actions--input_mappings))
+
+Read-Only:
+
+- `id` (String) Action id.
+
+<a id="nestedatt--panels--actions--input_mappings"></a>
+### Nested Schema for `panels.actions.input_mappings`
+
+Required:
+
+- `workflow_input_key` (String) The workflow input key this mapping fills.
+
+Optional:
+
+- `column` (String) Row column to use when prompt_user is false.
+- `prompt` (String) Prompt text shown to the user when prompt_user is true.
+- `prompt_user` (Boolean) When true, prompt the user for this value at run time instead of pulling it from a row column. Defaults to false.
+
+
 
 <a id="nestedatt--panels--inputs"></a>
 ### Nested Schema for `panels.inputs`

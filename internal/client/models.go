@@ -24,7 +24,6 @@ type DatabaseCredential struct {
 	Id                string `json:"id"`
 	Username          string `json:"username"`
 	Password          string `json:"password"`
-	Hostname          string `json:"hostname"`
 	ReviewsRequired   int    `json:"reviews_required"`
 	DefaultCredential bool   `json:"default_credential"`
 	AiAllowed         bool   `json:"ai_allowed"`
@@ -137,12 +136,27 @@ type DashboardPanel struct {
 	Id      string                 `json:"id"`
 	Title   string                 `json:"title"`
 	Inputs  []DashboardPanelInput  `json:"inputs"`
+	Actions []DashboardPanelAction `json:"actions"`
 	Details *DashboardPanelDetails `json:"details"`
 }
 
 type DashboardPanelInput struct {
 	Key         string `json:"key"`
 	Description string `json:"description"`
+}
+
+type DashboardPanelAction struct {
+	Id            string                             `json:"id"`
+	Label         string                             `json:"label"`
+	WorkflowId    string                             `json:"workflow_id"`
+	InputMappings []DashboardPanelActionInputMapping `json:"input_mappings"`
+}
+
+type DashboardPanelActionInputMapping struct {
+	WorkflowInputKey string `json:"workflow_input_key"`
+	Column           string `json:"column"`
+	Prompt           string `json:"prompt"`
+	PromptUser       bool   `json:"prompt_user"`
 }
 
 type DashboardPanelDetails struct {

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -41,12 +42,27 @@ type dashboardPanelModel struct {
 	Id           types.String                     `tfsdk:"id"`
 	Title        types.String                     `tfsdk:"title"`
 	Inputs       []dashboardPanelInputModel       `tfsdk:"inputs"`
+	Actions      []dashboardPanelActionModel      `tfsdk:"actions"`
 	QueryDetails *dashboardPanelQueryDetailsModel `tfsdk:"query_details"`
 }
 
 type dashboardPanelInputModel struct {
 	Key         types.String `tfsdk:"key"`
 	Description types.String `tfsdk:"description"`
+}
+
+type dashboardPanelActionModel struct {
+	Id            types.String                            `tfsdk:"id"`
+	Label         types.String                            `tfsdk:"label"`
+	WorkflowId    types.String                            `tfsdk:"workflow_id"`
+	InputMappings []dashboardPanelActionInputMappingModel `tfsdk:"input_mappings"`
+}
+
+type dashboardPanelActionInputMappingModel struct {
+	WorkflowInputKey types.String `tfsdk:"workflow_input_key"`
+	Column           types.String `tfsdk:"column"`
+	Prompt           types.String `tfsdk:"prompt"`
+	PromptUser       types.Bool   `tfsdk:"prompt_user"`
 }
 
 type dashboardPanelQueryDetailsModel struct {
@@ -113,6 +129,55 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 								},
 							},
 						},
+						"actions": schema.ListNestedAttribute{
+							Optional:            true,
+							MarkdownDescription: "Row actions that trigger a workflow when the user clicks the button on a row.",
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"id": schema.StringAttribute{
+										Computed:            true,
+										MarkdownDescription: "Action id.",
+										PlanModifiers: []planmodifier.String{
+											stringplanmodifier.UseStateForUnknown(),
+										},
+									},
+									"label": schema.StringAttribute{
+										MarkdownDescription: "Button label shown to the user.",
+										Required:            true,
+									},
+									"workflow_id": schema.StringAttribute{
+										MarkdownDescription: "ID of the workflow to trigger when the button is clicked.",
+										Required:            true,
+									},
+									"input_mappings": schema.ListNestedAttribute{
+										Optional:            true,
+										MarkdownDescription: "One entry per workflow input: either map a row column value or prompt the user at run time.",
+										NestedObject: schema.NestedAttributeObject{
+											Attributes: map[string]schema.Attribute{
+												"workflow_input_key": schema.StringAttribute{
+													MarkdownDescription: "The workflow input key this mapping fills.",
+													Required:            true,
+												},
+												"column": schema.StringAttribute{
+													MarkdownDescription: "Row column to use when prompt_user is false.",
+													Optional:            true,
+												},
+												"prompt": schema.StringAttribute{
+													MarkdownDescription: "Prompt text shown to the user when prompt_user is true.",
+													Optional:            true,
+												},
+												"prompt_user": schema.BoolAttribute{
+													MarkdownDescription: "When true, prompt the user for this value at run time instead of pulling it from a row column. Defaults to false.",
+													Optional:            true,
+													Computed:            true,
+													Default:             booldefault.StaticBool(false),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
 						"query_details": schema.SingleNestedAttribute{
 							Optional: true,
 							Validators: []validator.Object{
@@ -138,16 +203,20 @@ func (r *dashboardResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	}
 }
 
-func (r *dashboardResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan dashboardResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+// The API omits unset optional strings as null, which decodes to "". Reading that
+// back as an empty string would conflict with the null in configuration and leave a
+// perpetual diff, so map it back to null.
+func optionalString(value string) types.String {
+	if value == "" {
+		return types.StringNull()
 	}
 
+	return types.StringValue(value)
+}
+
+func planPanelsToDevhub(plan []dashboardPanelModel, includeIds bool) []devhub.DashboardPanel {
 	var panels []devhub.DashboardPanel
-	for _, statePanel := range plan.Panels {
+	for _, statePanel := range plan {
 		var inputs []devhub.DashboardPanelInput
 		for _, input := range statePanel.Inputs {
 			inputs = append(inputs, devhub.DashboardPanelInput{
@@ -156,9 +225,37 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 			})
 		}
 
+		var actions []devhub.DashboardPanelAction
+		for _, action := range statePanel.Actions {
+			var mappings []devhub.DashboardPanelActionInputMapping
+			for _, mapping := range action.InputMappings {
+				mappings = append(mappings, devhub.DashboardPanelActionInputMapping{
+					WorkflowInputKey: mapping.WorkflowInputKey.ValueString(),
+					Column:           mapping.Column.ValueString(),
+					Prompt:           mapping.Prompt.ValueString(),
+					PromptUser:       mapping.PromptUser.ValueBool(),
+				})
+			}
+
+			actionInput := devhub.DashboardPanelAction{
+				Label:         action.Label.ValueString(),
+				WorkflowId:    action.WorkflowId.ValueString(),
+				InputMappings: mappings,
+			}
+			if includeIds {
+				actionInput.Id = action.Id.ValueString()
+			}
+
+			actions = append(actions, actionInput)
+		}
+
 		panel := devhub.DashboardPanel{
-			Title:  statePanel.Title.ValueString(),
-			Inputs: inputs,
+			Title:   statePanel.Title.ValueString(),
+			Inputs:  inputs,
+			Actions: actions,
+		}
+		if includeIds {
+			panel.Id = statePanel.Id.ValueString()
 		}
 
 		if statePanel.QueryDetails != nil {
@@ -171,6 +268,18 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 
 		panels = append(panels, panel)
 	}
+	return panels
+}
+
+func (r *dashboardResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan dashboardResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	panels := planPanelsToDevhub(plan.Panels, false)
 
 	input := devhub.Dashboard{
 		Name:             plan.Name.ValueString(),
@@ -193,6 +302,12 @@ func (r *dashboardResource) Create(ctx context.Context, req resource.CreateReque
 
 	for index, panel := range createdDashboard.Panels {
 		plan.Panels[index].Id = types.StringValue(panel.Id)
+		for actionIndex, action := range panel.Actions {
+			plan.Panels[index].Actions[actionIndex].Id = types.StringValue(action.Id)
+			for mappingIndex, mapping := range action.InputMappings {
+				plan.Panels[index].Actions[actionIndex].InputMappings[mappingIndex].PromptUser = types.BoolValue(mapping.PromptUser)
+			}
+		}
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -236,14 +351,35 @@ func (r *dashboardResource) Read(ctx context.Context, req resource.ReadRequest, 
 		for _, input := range panel.Inputs {
 			inputs = append(inputs, dashboardPanelInputModel{
 				Key:         types.StringValue(input.Key),
-				Description: types.StringValue(input.Description),
+				Description: optionalString(input.Description),
+			})
+		}
+
+		var actions []dashboardPanelActionModel
+		for _, action := range panel.Actions {
+			var mappings []dashboardPanelActionInputMappingModel
+			for _, mapping := range action.InputMappings {
+				mappings = append(mappings, dashboardPanelActionInputMappingModel{
+					WorkflowInputKey: types.StringValue(mapping.WorkflowInputKey),
+					Column:           optionalString(mapping.Column),
+					Prompt:           optionalString(mapping.Prompt),
+					PromptUser:       types.BoolValue(mapping.PromptUser),
+				})
+			}
+
+			actions = append(actions, dashboardPanelActionModel{
+				Id:            types.StringValue(action.Id),
+				Label:         types.StringValue(action.Label),
+				WorkflowId:    types.StringValue(action.WorkflowId),
+				InputMappings: mappings,
 			})
 		}
 
 		panelModel := dashboardPanelModel{
-			Id:     types.StringValue(panel.Id),
-			Title:  types.StringValue(panel.Title),
-			Inputs: inputs,
+			Id:      types.StringValue(panel.Id),
+			Title:   types.StringValue(panel.Title),
+			Inputs:  inputs,
+			Actions: actions,
 		}
 
 		if panel.Details.Type == "query" {
@@ -273,32 +409,7 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	var panels []devhub.DashboardPanel
-	for _, statePanel := range plan.Panels {
-		var inputs []devhub.DashboardPanelInput
-		for _, input := range statePanel.Inputs {
-			inputs = append(inputs, devhub.DashboardPanelInput{
-				Key:         input.Key.ValueString(),
-				Description: input.Description.ValueString(),
-			})
-		}
-
-		panel := devhub.DashboardPanel{
-			Id:     statePanel.Id.ValueString(),
-			Title:  statePanel.Title.ValueString(),
-			Inputs: inputs,
-		}
-
-		if statePanel.QueryDetails != nil {
-			panel.Details = &devhub.DashboardPanelDetails{
-				Type:         "query",
-				Query:        statePanel.QueryDetails.Query.ValueString(),
-				CredentialId: statePanel.QueryDetails.CredentialId.ValueString(),
-			}
-		}
-
-		panels = append(panels, panel)
-	}
+	panels := planPanelsToDevhub(plan.Panels, true)
 
 	dashboard := devhub.Dashboard{
 		Id:               plan.Id.ValueString(),
@@ -320,6 +431,12 @@ func (r *dashboardResource) Update(ctx context.Context, req resource.UpdateReque
 
 	for index, panel := range updatedDashboard.Panels {
 		plan.Panels[index].Id = types.StringValue(panel.Id)
+		for actionIndex, action := range panel.Actions {
+			plan.Panels[index].Actions[actionIndex].Id = types.StringValue(action.Id)
+			for mappingIndex, mapping := range action.InputMappings {
+				plan.Panels[index].Actions[actionIndex].InputMappings[mappingIndex].PromptUser = types.BoolValue(mapping.PromptUser)
+			}
+		}
 	}
 
 	diags = resp.State.Set(ctx, plan)
