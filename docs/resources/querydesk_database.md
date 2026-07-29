@@ -58,6 +58,7 @@ resource "devhub_querydesk_database" "example" {
 - `restrict_access` (Boolean) Whether access to this databases should be explicitly granted to users or if any authenticated user can access it.
 - `slack_channel` (String) The slack channel to send query request notifications to.
 - `ssl` (Boolean) Set to `true` to turn on ssl connections for this database.
+- `verify_server_hostname` (Boolean) Set to `true` to also verify that the server certificate matches the `hostname` being connected to (Postgres `sslmode=verify-full`). Requires `cacertfile`; without it the connection is encrypt-only and nothing is verified. Leave `false` for managed services that present a certificate not matching the endpoint hostname.
 
 ### Read-Only
 

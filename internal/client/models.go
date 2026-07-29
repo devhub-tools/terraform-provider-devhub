@@ -1,23 +1,24 @@
 package devhub
 
 type Database struct {
-	Id             string               `json:"id"`
-	Name           string               `json:"name"`
-	Adapter        string               `json:"adapter"`
-	Hostname       string               `json:"hostname"`
-	Port           *int64               `json:"port"`
-	Database       string               `json:"database"`
-	Ssl            bool                 `json:"ssl"`
-	Cacertfile     string               `json:"cacertfile"`
-	Keyfile        string               `json:"keyfile"`
-	Certfile       string               `json:"certfile"`
-	RestrictAccess bool                 `json:"restrict_access"`
-	Group          string               `json:"group"`
-	SlackChannel   string               `json:"slack_channel"`
-	AgentId        string               `json:"agent_id"`
-	AiEnabled      bool                 `json:"ai_enabled"`
-	AiMaxRows      int64                `json:"ai_max_rows"`
-	Credentials    []DatabaseCredential `json:"credentials"`
+	Id                   string               `json:"id"`
+	Name                 string               `json:"name"`
+	Adapter              string               `json:"adapter"`
+	Hostname             string               `json:"hostname"`
+	Port                 *int64               `json:"port"`
+	Database             string               `json:"database"`
+	Ssl                  bool                 `json:"ssl"`
+	Cacertfile           string               `json:"cacertfile"`
+	Keyfile              string               `json:"keyfile"`
+	Certfile             string               `json:"certfile"`
+	VerifyServerHostname bool                 `json:"verify_server_hostname"`
+	RestrictAccess       bool                 `json:"restrict_access"`
+	Group                string               `json:"group"`
+	SlackChannel         string               `json:"slack_channel"`
+	AgentId              string               `json:"agent_id"`
+	AiEnabled            bool                 `json:"ai_enabled"`
+	AiMaxRows            int64                `json:"ai_max_rows"`
+	Credentials          []DatabaseCredential `json:"credentials"`
 }
 
 type DatabaseCredential struct {

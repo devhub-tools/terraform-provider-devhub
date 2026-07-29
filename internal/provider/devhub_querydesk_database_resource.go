@@ -34,24 +34,25 @@ func DatabaseResource() resource.Resource {
 
 // DatabaseResourceModel describes the resource data model.
 type databaseResourceModel struct {
-	Id             types.String              `tfsdk:"id"`
-	Name           types.String              `tfsdk:"name"`
-	Adapter        types.String              `tfsdk:"adapter"`
-	Hostname       types.String              `tfsdk:"hostname"`
-	Port           types.Int64               `tfsdk:"port"`
-	Database       types.String              `tfsdk:"database"`
-	Ssl            types.Bool                `tfsdk:"ssl"`
-	Cacertfile     types.String              `tfsdk:"cacertfile"`
-	Keyfile        types.String              `tfsdk:"keyfile"`
-	Certfile       types.String              `tfsdk:"certfile"`
-	RestrictAccess types.Bool                `tfsdk:"restrict_access"`
-	Group          types.String              `tfsdk:"group"`
-	SlackChannel   types.String              `tfsdk:"slack_channel"`
-	AgentId        types.String              `tfsdk:"agent_id"`
-	AiEnabled      types.Bool                `tfsdk:"ai_enabled"`
-	AiMaxRows      types.Int64               `tfsdk:"ai_max_rows"`
-	Credentials    []databaseCredentialModel `tfsdk:"credentials"`
-	CredentialIds  types.Map                 `tfsdk:"credential_ids"`
+	Id                   types.String              `tfsdk:"id"`
+	Name                 types.String              `tfsdk:"name"`
+	Adapter              types.String              `tfsdk:"adapter"`
+	Hostname             types.String              `tfsdk:"hostname"`
+	Port                 types.Int64               `tfsdk:"port"`
+	Database             types.String              `tfsdk:"database"`
+	Ssl                  types.Bool                `tfsdk:"ssl"`
+	Cacertfile           types.String              `tfsdk:"cacertfile"`
+	Keyfile              types.String              `tfsdk:"keyfile"`
+	Certfile             types.String              `tfsdk:"certfile"`
+	VerifyServerHostname types.Bool                `tfsdk:"verify_server_hostname"`
+	RestrictAccess       types.Bool                `tfsdk:"restrict_access"`
+	Group                types.String              `tfsdk:"group"`
+	SlackChannel         types.String              `tfsdk:"slack_channel"`
+	AgentId              types.String              `tfsdk:"agent_id"`
+	AiEnabled            types.Bool                `tfsdk:"ai_enabled"`
+	AiMaxRows            types.Int64               `tfsdk:"ai_max_rows"`
+	Credentials          []databaseCredentialModel `tfsdk:"credentials"`
+	CredentialIds        types.Map                 `tfsdk:"credential_ids"`
 }
 
 type databaseCredentialModel struct {
@@ -125,6 +126,12 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				MarkdownDescription: "The client cert to use with ssl connections, `ssl` must be set to `true`.",
 				Optional:            true,
 				Sensitive:           true,
+			},
+			"verify_server_hostname": schema.BoolAttribute{
+				MarkdownDescription: "Set to `true` to also verify that the server certificate matches the `hostname` being connected to (Postgres `sslmode=verify-full`). Requires `cacertfile`; without it the connection is encrypt-only and nothing is verified. Leave `false` for managed services that present a certificate not matching the endpoint hostname.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 			},
 			"restrict_access": schema.BoolAttribute{
 				MarkdownDescription: "Whether access to this databases should be explicitly granted to users or if any authenticated user can access it.",
@@ -223,6 +230,7 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 	model.Hostname = types.StringValue(database.Hostname)
 	model.Database = types.StringValue(database.Database)
 	model.Ssl = types.BoolValue(database.Ssl)
+	model.VerifyServerHostname = types.BoolValue(database.VerifyServerHostname)
 	model.RestrictAccess = types.BoolValue(database.RestrictAccess)
 	model.AiEnabled = types.BoolValue(database.AiEnabled)
 	model.AiMaxRows = types.Int64Value(database.AiMaxRows)
@@ -307,22 +315,23 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	input := devhub.Database{
-		Name:           plan.Name.ValueString(),
-		Adapter:        strings.ToLower(plan.Adapter.ValueString()),
-		Hostname:       plan.Hostname.ValueString(),
-		Port:           port,
-		Database:       plan.Database.ValueString(),
-		Ssl:            plan.Ssl.ValueBool(),
-		Cacertfile:     plan.Cacertfile.ValueString(),
-		Keyfile:        plan.Keyfile.ValueString(),
-		Certfile:       plan.Certfile.ValueString(),
-		RestrictAccess: plan.RestrictAccess.ValueBool(),
-		Group:          plan.Group.ValueString(),
-		SlackChannel:   plan.SlackChannel.ValueString(),
-		AgentId:        plan.AgentId.ValueString(),
-		AiEnabled:      plan.AiEnabled.ValueBool(),
-		AiMaxRows:      plan.AiMaxRows.ValueInt64(),
-		Credentials:    credentials,
+		Name:                 plan.Name.ValueString(),
+		Adapter:              strings.ToLower(plan.Adapter.ValueString()),
+		Hostname:             plan.Hostname.ValueString(),
+		Port:                 port,
+		Database:             plan.Database.ValueString(),
+		Ssl:                  plan.Ssl.ValueBool(),
+		Cacertfile:           plan.Cacertfile.ValueString(),
+		Keyfile:              plan.Keyfile.ValueString(),
+		Certfile:             plan.Certfile.ValueString(),
+		VerifyServerHostname: plan.VerifyServerHostname.ValueBool(),
+		RestrictAccess:       plan.RestrictAccess.ValueBool(),
+		Group:                plan.Group.ValueString(),
+		SlackChannel:         plan.SlackChannel.ValueString(),
+		AgentId:              plan.AgentId.ValueString(),
+		AiEnabled:            plan.AiEnabled.ValueBool(),
+		AiMaxRows:            plan.AiMaxRows.ValueInt64(),
+		Credentials:          credentials,
 	}
 
 	database, err := r.client.CreateDatabase(input)
@@ -414,22 +423,23 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	input := devhub.Database{
-		Name:           plan.Name.ValueString(),
-		Adapter:        strings.ToLower(plan.Adapter.ValueString()),
-		Hostname:       plan.Hostname.ValueString(),
-		Port:           port,
-		Database:       plan.Database.ValueString(),
-		Ssl:            plan.Ssl.ValueBool(),
-		Cacertfile:     plan.Cacertfile.ValueString(),
-		Keyfile:        plan.Keyfile.ValueString(),
-		Certfile:       plan.Certfile.ValueString(),
-		RestrictAccess: plan.RestrictAccess.ValueBool(),
-		Group:          plan.Group.ValueString(),
-		SlackChannel:   plan.SlackChannel.ValueString(),
-		AgentId:        plan.AgentId.ValueString(),
-		AiEnabled:      plan.AiEnabled.ValueBool(),
-		AiMaxRows:      plan.AiMaxRows.ValueInt64(),
-		Credentials:    credentials,
+		Name:                 plan.Name.ValueString(),
+		Adapter:              strings.ToLower(plan.Adapter.ValueString()),
+		Hostname:             plan.Hostname.ValueString(),
+		Port:                 port,
+		Database:             plan.Database.ValueString(),
+		Ssl:                  plan.Ssl.ValueBool(),
+		Cacertfile:           plan.Cacertfile.ValueString(),
+		Keyfile:              plan.Keyfile.ValueString(),
+		Certfile:             plan.Certfile.ValueString(),
+		VerifyServerHostname: plan.VerifyServerHostname.ValueBool(),
+		RestrictAccess:       plan.RestrictAccess.ValueBool(),
+		Group:                plan.Group.ValueString(),
+		SlackChannel:         plan.SlackChannel.ValueString(),
+		AgentId:              plan.AgentId.ValueString(),
+		AiEnabled:            plan.AiEnabled.ValueBool(),
+		AiMaxRows:            plan.AiMaxRows.ValueInt64(),
+		Credentials:          credentials,
 	}
 
 	// Update existing order
