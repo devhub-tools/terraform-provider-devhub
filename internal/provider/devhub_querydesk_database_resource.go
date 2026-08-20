@@ -46,6 +46,7 @@ type databaseResourceModel struct {
 	Certfile             types.String              `tfsdk:"certfile"`
 	VerifyServerHostname types.Bool                `tfsdk:"verify_server_hostname"`
 	RestrictAccess       types.Bool                `tfsdk:"restrict_access"`
+	ReviewBypassAllowed  types.Bool                `tfsdk:"review_bypass_allowed"`
 	Group                types.String              `tfsdk:"group"`
 	SlackChannel         types.String              `tfsdk:"slack_channel"`
 	AgentId              types.String              `tfsdk:"agent_id"`
@@ -138,6 +139,12 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
+			},
+			"review_bypass_allowed": schema.BoolAttribute{
+				MarkdownDescription: "Set to `true` to let a super admin run their own query that hasn't met the `reviews_required` on its credential, by explicitly acknowledging the override. Only a super admin can, holding approve on the database is not enough, and every bypass is recorded against the query, shown in the audit log, and posted to `slack_channel`. Defaults to `false`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 			},
 			"group": schema.StringAttribute{
 				MarkdownDescription: "The group this database belongs to, used for UI grouping.",
@@ -232,6 +239,7 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 	model.Ssl = types.BoolValue(database.Ssl)
 	model.VerifyServerHostname = types.BoolValue(database.VerifyServerHostname)
 	model.RestrictAccess = types.BoolValue(database.RestrictAccess)
+	model.ReviewBypassAllowed = types.BoolValue(database.ReviewBypassAllowed)
 	model.AiEnabled = types.BoolValue(database.AiEnabled)
 	model.AiMaxRows = types.Int64Value(database.AiMaxRows)
 
@@ -326,6 +334,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		Certfile:             plan.Certfile.ValueString(),
 		VerifyServerHostname: plan.VerifyServerHostname.ValueBool(),
 		RestrictAccess:       plan.RestrictAccess.ValueBool(),
+		ReviewBypassAllowed:  plan.ReviewBypassAllowed.ValueBool(),
 		Group:                plan.Group.ValueString(),
 		SlackChannel:         plan.SlackChannel.ValueString(),
 		AgentId:              plan.AgentId.ValueString(),
@@ -434,6 +443,7 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		Certfile:             plan.Certfile.ValueString(),
 		VerifyServerHostname: plan.VerifyServerHostname.ValueBool(),
 		RestrictAccess:       plan.RestrictAccess.ValueBool(),
+		ReviewBypassAllowed:  plan.ReviewBypassAllowed.ValueBool(),
 		Group:                plan.Group.ValueString(),
 		SlackChannel:         plan.SlackChannel.ValueString(),
 		AgentId:              plan.AgentId.ValueString(),

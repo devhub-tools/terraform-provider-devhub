@@ -131,3 +131,70 @@ resource "devhub_terradesk_workspace" "test" {
 }
 `, email)
 }
+
+func TestAccWorkspaceWithInitContainersResource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: testAccWorkspaceWithInitContainersResourceConfig("1password/op:2"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "command", "/home/terradesk/bin/op run -- terraform"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "init_containers.0.name", "install-op"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "init_containers.0.image", "1password/op:2"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "init_containers.0.command", `sh -c "cp /usr/local/bin/op /home/terradesk/bin/"`),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "secrets.0.name", "OP_SERVICE_ACCOUNT_TOKEN"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "secrets.0.raw", "true"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "devhub_terradesk_workspace.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"secrets.0.value"},
+			},
+			// Update and Read testing
+			{
+				Config: testAccWorkspaceWithInitContainersResourceConfig("1password/op:2.30"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "init_containers.0.image", "1password/op:2.30"),
+					// everything else should be the same
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "command", "/home/terradesk/bin/op run -- terraform"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "init_containers.0.name", "install-op"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "secrets.0.raw", "true"),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func testAccWorkspaceWithInitContainersResourceConfig(image string) string {
+	return providerConfig + fmt.Sprintf(`
+resource "devhub_terradesk_workspace" "test" {
+  name     		 = "my_workspace"
+  repository   = "devhub-tools/devhub"
+	path 				 = "terraform"
+	docker_image = "hashicorp/terraform:1.10"
+	command      = "/home/terradesk/bin/op run -- terraform"
+
+	init_containers = [
+		{
+			name = "install-op"
+			image = %[1]q
+			command = "sh -c \"cp /usr/local/bin/op /home/terradesk/bin/\""
+		}
+	]
+
+	secrets = [
+		{
+			name = "OP_SERVICE_ACCOUNT_TOKEN"
+			value = "ops_token"
+			raw = true
+		}
+	]
+}
+`, image)
+}

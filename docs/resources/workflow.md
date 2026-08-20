@@ -70,7 +70,10 @@ resource "devhub_workflow" "example" {
       name = "approval-step"
 
       approval_action = {
-        required_approvals = 1
+        reviews_required = 1
+        permissions = [
+          { permission = "approve", role_id = "role_xxx" }
+        ]
       }
     },
     {

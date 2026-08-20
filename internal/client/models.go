@@ -13,6 +13,7 @@ type Database struct {
 	Certfile             string               `json:"certfile"`
 	VerifyServerHostname bool                 `json:"verify_server_hostname"`
 	RestrictAccess       bool                 `json:"restrict_access"`
+	ReviewBypassAllowed  bool                 `json:"review_bypass_allowed"`
 	Group                string               `json:"group"`
 	SlackChannel         string               `json:"slack_channel"`
 	AgentId              string               `json:"agent_id"`
@@ -40,12 +41,14 @@ type TerradeskWorkspace struct {
 	RunPlansAutomatically bool              `json:"run_plans_automatically"`
 	RequiredApprovals     int               `json:"required_approvals"`
 	DockerImage           string            `json:"docker_image"`
+	Command               string            `json:"command"`
 	CpuRequests           string            `json:"cpu_requests"`
 	MemoryRequests        string            `json:"memory_requests"`
 	AgentId               string            `json:"agent_id"`
 	WorkloadIdentity      *WorkloadIdentity `json:"workload_identity"`
 	EnvVars               []EnvVar          `json:"env_vars"`
 	Secrets               []Secret          `json:"secrets"`
+	InitContainers        []InitContainer   `json:"init_containers"`
 }
 
 type WorkloadIdentity struct {
@@ -60,10 +63,17 @@ type EnvVar struct {
 	Value string `json:"value"`
 }
 
+type InitContainer struct {
+	Name    string `json:"name"`
+	Image   string `json:"image"`
+	Command string `json:"command"`
+}
+
 type Secret struct {
 	Id    string `json:"id"`
 	Name  string `json:"name"`
 	Value string `json:"value"`
+	Raw   bool   `json:"raw"`
 }
 
 type Workflow struct {

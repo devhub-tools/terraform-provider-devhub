@@ -15,13 +15,14 @@ func TestAccDatabaseResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccDatabaseResourceConfig(name, true, 100, true, 30),
+				Config: testAccDatabaseResourceConfig(name, true, 100, true, 30, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "adapter", "POSTGRES"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "hostname", "localhost"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ssl", "false"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "restrict_access", "true"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "review_bypass_allowed", "true"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_enabled", "true"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_max_rows", "100"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.username", "postgres"),
@@ -49,13 +50,14 @@ func TestAccDatabaseResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60),
+				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name+"_updated"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "adapter", "POSTGRES"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "hostname", "localhost"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ssl", "false"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "restrict_access", "true"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "review_bypass_allowed", "false"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_enabled", "false"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_max_rows", "250"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.username", "postgres"),
@@ -78,7 +80,7 @@ func TestAccDatabaseResource(t *testing.T) {
 	})
 }
 
-func testAccDatabaseResourceConfig(name string, aiEnabled bool, aiMaxRows int, aiAllowed bool, timeout int) string {
+func testAccDatabaseResourceConfig(name string, aiEnabled bool, aiMaxRows int, aiAllowed bool, timeout int, reviewBypassAllowed bool) string {
 	return providerConfig + fmt.Sprintf(`
 resource "devhub_querydesk_database" "test" {
   name        = %[1]q
@@ -87,6 +89,7 @@ resource "devhub_querydesk_database" "test" {
   database    = "mydb"
   ai_enabled  = %[2]t
   ai_max_rows = %[3]d
+  review_bypass_allowed = %[6]t
 
 	credentials = [
 		{
@@ -104,5 +107,5 @@ resource "devhub_querydesk_database" "test" {
 	}
 	]
 }
-`, name, aiEnabled, aiMaxRows, aiAllowed, timeout)
+`, name, aiEnabled, aiMaxRows, aiAllowed, timeout, reviewBypassAllowed)
 }

@@ -19,6 +19,18 @@ resource "devhub_terradesk_workspace" "example" {
   path         = "terraform"
   docker_image = "hashicorp/terraform:1.10"
 
+  # wrap every terraform command in `op run` so 1Password resolves op:// references
+  command = "/home/terradesk/bin/op run -- terraform"
+
+  # stage the op binary onto the shared volume before terraform init runs
+  init_containers = [
+    {
+      name    = "install-op"
+      image   = "1password/op:2"
+      command = "sh -c \"cp /usr/local/bin/op /home/terradesk/bin/\""
+    }
+  ]
+
   env_vars = [
     {
       name  = "ENV_VAR"
@@ -30,6 +42,12 @@ resource "devhub_terradesk_workspace" "example" {
     {
       name  = "my_secret"
       value = "secret-value"
+    },
+    {
+      # raw secrets skip the TF_VAR_ prefix, so `op` can read its own token
+      name  = "OP_SERVICE_ACCOUNT_TOKEN"
+      value = var.op_service_account_token
+      raw   = true
     }
   ]
 
@@ -74,9 +92,11 @@ resource "google_iam_workload_identity_pool_provider" "devhub" {
 ### Optional
 
 - `agent_id` (String) The agent id for the database.
+- `command` (String) Replaces the image's entrypoint for the init, plan and apply containers, for example: `op run -- terraform`. The terraform arguments are appended to it. Leave unset to use the image's own entrypoint.
 - `cpu_requests` (String) How much cpu should be requested for the pod scheduled by the job, see kubernetes docs for allowable values.
 - `env_vars` (Attributes List) (see [below for nested schema](#nestedatt--env_vars))
 - `init_args` (String) Args to pass to the init command.
+- `init_containers` (Attributes List) Containers that run after the repository is checked out and before `terraform init`, in the order listed. Use them to stage tooling the terraform containers need. They share the `/workspace` and `/home/terradesk` volumes and the same environment. A binary staged here must be statically linked, or built against the same libc as the terraform image (Alpine/musl). (see [below for nested schema](#nestedatt--init_containers))
 - `memory_requests` (String) How much memory should be requested for the pod scheduled by the job, see kubernetes docs for allowable values.
 - `path` (String) The file path of here the workspace is located in the provided GitHub repository. Defaults to the root of the repository.
 - `required_approvals` (Number) Specify how many reviews are required to apply plans.
@@ -101,6 +121,19 @@ Read-Only:
 - `id` (String) Env var id.
 
 
+<a id="nestedatt--init_containers"></a>
+### Nested Schema for `init_containers`
+
+Required:
+
+- `image` (String) The docker image to run, for example: 1password/op:2.
+- `name` (String) Container name. Lowercase alphanumeric and `-`, at most 63 characters, unique within the workspace, and not one of the built-in names (`git`, `init`, `plan`, `apply`, `upload-plan`, `download-plan`).
+
+Optional:
+
+- `command` (String) Replaces the image's entrypoint, for example: `sh -c "cp /usr/local/bin/op /home/terradesk/bin/"`. Leave unset to use the image's own entrypoint.
+
+
 <a id="nestedatt--secrets"></a>
 ### Nested Schema for `secrets`
 
@@ -108,6 +141,10 @@ Required:
 
 - `name` (String) Secret name.
 - `value` (String, Sensitive) Secret value.
+
+Optional:
+
+- `raw` (Boolean) Expose the secret under its literal name instead of `TF_VAR_<name>`, for tooling that reads its own environment (for example `OP_SERVICE_ACCOUNT_TOKEN`).
 
 Read-Only:
 

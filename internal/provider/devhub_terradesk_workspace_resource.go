@@ -42,18 +42,26 @@ type terradeskWorkspaceResourceModel struct {
 	RunPlansAutomatically types.Bool             `tfsdk:"run_plans_automatically"`
 	RequiredApprovals     types.Int64            `tfsdk:"required_approvals"`
 	DockerImage           types.String           `tfsdk:"docker_image"`
+	Command               types.String           `tfsdk:"command"`
 	CpuRequests           types.String           `tfsdk:"cpu_requests"`
 	MemoryRequests        types.String           `tfsdk:"memory_requests"`
 	AgentId               types.String           `tfsdk:"agent_id"`
 	WorkloadIdentity      *workloadIdentityModel `tfsdk:"workload_identity"`
 	EnvVars               []envVarModel          `tfsdk:"env_vars"`
 	Secrets               []secretModel          `tfsdk:"secrets"`
+	InitContainers        []initContainerModel   `tfsdk:"init_containers"`
 }
 
 type workloadIdentityModel struct {
 	Enabled             types.Bool   `tfsdk:"enabled"`
 	ServiceAccountEmail types.String `tfsdk:"service_account_email"`
 	Provider            types.String `tfsdk:"provider"`
+}
+
+type initContainerModel struct {
+	Name    types.String `tfsdk:"name"`
+	Image   types.String `tfsdk:"image"`
+	Command types.String `tfsdk:"command"`
 }
 
 type envVarModel struct {
@@ -66,6 +74,7 @@ type secretModel struct {
 	Id    types.String `tfsdk:"id"`
 	Name  types.String `tfsdk:"name"`
 	Value types.String `tfsdk:"value"`
+	Raw   types.Bool   `tfsdk:"raw"`
 }
 
 type terradeskWorkspaceResource struct {
@@ -120,6 +129,12 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 			"docker_image": schema.StringAttribute{
 				MarkdownDescription: "The docker image to use for running commands, for example: hashicorp/terraform:1.10.",
 				Required:            true,
+			},
+			"command": schema.StringAttribute{
+				MarkdownDescription: "Replaces the image's entrypoint for the init, plan and apply containers, for example: `op run -- terraform`. The terraform arguments are appended to it. Leave unset to use the image's own entrypoint.",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString(""),
 			},
 			"cpu_requests": schema.StringAttribute{
 				MarkdownDescription: "How much cpu should be requested for the pod scheduled by the job, see kubernetes docs for allowable values.",
@@ -191,6 +206,41 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 					},
 				},
 			},
+			"init_containers": schema.ListNestedAttribute{
+				MarkdownDescription: "Containers that run after the repository is checked out and before `terraform init`, in the order listed. Use them to stage tooling the terraform containers need. They share the `/workspace` and `/home/terradesk` volumes and the same environment. A binary staged here must be statically linked, or built against the same libc as the terraform image (Alpine/musl).",
+				Optional:            true,
+				Computed:            true,
+				Default: listdefault.StaticValue(
+					types.ListValueMust(
+						types.ObjectType{
+							AttrTypes: map[string]attr.Type{
+								"name":    types.StringType,
+								"image":   types.StringType,
+								"command": types.StringType,
+							},
+						},
+						[]attr.Value{},
+					),
+				),
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							MarkdownDescription: "Container name. Lowercase alphanumeric and `-`, at most 63 characters, unique within the workspace, and not one of the built-in names (`git`, `init`, `plan`, `apply`, `upload-plan`, `download-plan`).",
+							Required:            true,
+						},
+						"image": schema.StringAttribute{
+							MarkdownDescription: "The docker image to run, for example: 1password/op:2.",
+							Required:            true,
+						},
+						"command": schema.StringAttribute{
+							MarkdownDescription: "Replaces the image's entrypoint, for example: `sh -c \"cp /usr/local/bin/op /home/terradesk/bin/\"`. Leave unset to use the image's own entrypoint.",
+							Optional:            true,
+							Computed:            true,
+							Default:             stringdefault.StaticString(""),
+						},
+					},
+				},
+			},
 			"secrets": schema.ListNestedAttribute{
 				Optional: true,
 				Computed: true,
@@ -201,6 +251,7 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 								"id":    types.StringType,
 								"name":  types.StringType,
 								"value": types.StringType,
+								"raw":   types.BoolType,
 							},
 						},
 						[]attr.Value{},
@@ -223,6 +274,12 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 							MarkdownDescription: "Secret value.",
 							Required:            true,
 							Sensitive:           true,
+						},
+						"raw": schema.BoolAttribute{
+							MarkdownDescription: "Expose the secret under its literal name instead of `TF_VAR_<name>`, for tooling that reads its own environment (for example `OP_SERVICE_ACCOUNT_TOKEN`).",
+							Optional:            true,
+							Computed:            true,
+							Default:             booldefault.StaticBool(false),
 						},
 					},
 				},
@@ -253,6 +310,16 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 		secrets = append(secrets, devhub.Secret{
 			Name:  secret.Name.ValueString(),
 			Value: secret.Value.ValueString(),
+			Raw:   secret.Raw.ValueBool(),
+		})
+	}
+
+	var initContainers []devhub.InitContainer
+	for _, initContainer := range plan.InitContainers {
+		initContainers = append(initContainers, devhub.InitContainer{
+			Name:    initContainer.Name.ValueString(),
+			Image:   initContainer.Image.ValueString(),
+			Command: initContainer.Command.ValueString(),
 		})
 	}
 
@@ -264,11 +331,13 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 		RunPlansAutomatically: plan.RunPlansAutomatically.ValueBool(),
 		RequiredApprovals:     int(plan.RequiredApprovals.ValueInt64()),
 		DockerImage:           plan.DockerImage.ValueString(),
+		Command:               plan.Command.ValueString(),
 		CpuRequests:           plan.CpuRequests.ValueString(),
 		MemoryRequests:        plan.MemoryRequests.ValueString(),
 		AgentId:               plan.AgentId.ValueString(),
 		EnvVars:               envVars,
 		Secrets:               secrets,
+		InitContainers:        initContainers,
 	}
 
 	if plan.WorkloadIdentity != nil {
@@ -346,6 +415,8 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 	state.RunPlansAutomatically = types.BoolValue(workspace.RunPlansAutomatically)
 	state.RequiredApprovals = types.Int64Value(int64(workspace.RequiredApprovals))
 	state.DockerImage = types.StringValue(workspace.DockerImage)
+
+	state.Command = types.StringValue(workspace.Command)
 	state.CpuRequests = types.StringValue(workspace.CpuRequests)
 	state.MemoryRequests = types.StringValue(workspace.MemoryRequests)
 
@@ -382,6 +453,17 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 	for index, secret := range workspace.Secrets {
 		state.Secrets[index].Id = types.StringValue(secret.Id)
 		state.Secrets[index].Name = types.StringValue(secret.Name)
+		state.Secrets[index].Raw = types.BoolValue(secret.Raw)
+	}
+
+	if state.InitContainers == nil || len(state.InitContainers) != len(workspace.InitContainers) {
+		state.InitContainers = make([]initContainerModel, len(workspace.InitContainers))
+	}
+
+	for index, initContainer := range workspace.InitContainers {
+		state.InitContainers[index].Name = types.StringValue(initContainer.Name)
+		state.InitContainers[index].Image = types.StringValue(initContainer.Image)
+		state.InitContainers[index].Command = types.StringValue(initContainer.Command)
 	}
 
 	// Set refreshed state
@@ -416,6 +498,16 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 			Id:    secret.Id.ValueString(),
 			Name:  secret.Name.ValueString(),
 			Value: secret.Value.ValueString(),
+			Raw:   secret.Raw.ValueBool(),
+		})
+	}
+
+	var initContainers []devhub.InitContainer
+	for _, initContainer := range plan.InitContainers {
+		initContainers = append(initContainers, devhub.InitContainer{
+			Name:    initContainer.Name.ValueString(),
+			Image:   initContainer.Image.ValueString(),
+			Command: initContainer.Command.ValueString(),
 		})
 	}
 
@@ -427,11 +519,13 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 		RunPlansAutomatically: plan.RunPlansAutomatically.ValueBool(),
 		RequiredApprovals:     int(plan.RequiredApprovals.ValueInt64()),
 		DockerImage:           plan.DockerImage.ValueString(),
+		Command:               plan.Command.ValueString(),
 		CpuRequests:           plan.CpuRequests.ValueString(),
 		MemoryRequests:        plan.MemoryRequests.ValueString(),
 		AgentId:               plan.AgentId.ValueString(),
 		EnvVars:               envVars,
 		Secrets:               secrets,
+		InitContainers:        initContainers,
 	}
 
 	if plan.WorkloadIdentity != nil {

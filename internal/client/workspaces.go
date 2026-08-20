@@ -36,6 +36,10 @@ func (c *Client) CreateWorkspace(input TerradeskWorkspace) (*TerradeskWorkspace,
 		input.Secrets = make([]Secret, 0)
 	}
 
+	if input.InitContainers == nil {
+		input.InitContainers = make([]InitContainer, 0)
+	}
+
 	rb, err := json.Marshal(input)
 	if err != nil {
 		return nil, err
@@ -67,6 +71,10 @@ func (c *Client) UpdateWorkspace(workspaceId string, input TerradeskWorkspace) (
 
 	if input.Secrets == nil {
 		input.Secrets = make([]Secret, 0)
+	}
+
+	if input.InitContainers == nil {
+		input.InitContainers = make([]InitContainer, 0)
 	}
 
 	rb, err := json.Marshal(input)

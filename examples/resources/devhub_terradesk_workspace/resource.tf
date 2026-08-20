@@ -4,6 +4,18 @@ resource "devhub_terradesk_workspace" "example" {
   path         = "terraform"
   docker_image = "hashicorp/terraform:1.10"
 
+  # wrap every terraform command in `op run` so 1Password resolves op:// references
+  command = "/home/terradesk/bin/op run -- terraform"
+
+  # stage the op binary onto the shared volume before terraform init runs
+  init_containers = [
+    {
+      name    = "install-op"
+      image   = "1password/op:2"
+      command = "sh -c \"cp /usr/local/bin/op /home/terradesk/bin/\""
+    }
+  ]
+
   env_vars = [
     {
       name  = "ENV_VAR"
@@ -15,6 +27,12 @@ resource "devhub_terradesk_workspace" "example" {
     {
       name  = "my_secret"
       value = "secret-value"
+    },
+    {
+      # raw secrets skip the TF_VAR_ prefix, so `op` can read its own token
+      name  = "OP_SERVICE_ACCOUNT_TOKEN"
+      value = var.op_service_account_token
+      raw   = true
     }
   ]
 

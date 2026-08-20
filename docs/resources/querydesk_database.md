@@ -14,18 +14,19 @@ Database resource
 
 ```terraform
 resource "devhub_querydesk_database" "example" {
-  name        = "terraform_test"
-  adapter     = "POSTGRES"
-  hostname    = "localhost"
-  database    = "mydb"
-  ai_enabled  = true
-  ai_max_rows = 500
+  name                  = "terraform_test"
+  adapter               = "POSTGRES"
+  hostname              = "localhost"
+  database              = "mydb"
+  ai_enabled            = true
+  ai_max_rows           = 500
+  review_bypass_allowed = true
 
   credentials = [
     {
       username           = "postgres"
       password           = "postgres"
-      reviews_required   = 0
+      reviews_required   = 1
       default_credential = true
       ai_allowed         = true
       timeout            = 30
@@ -56,6 +57,7 @@ resource "devhub_querydesk_database" "example" {
 - `keyfile` (String, Sensitive) The client key to use with ssl connections, `ssl` must be set to `true`.
 - `port` (Number) The port to connect to the database on, if not specified the default port for the database type will be used.
 - `restrict_access` (Boolean) Whether access to this databases should be explicitly granted to users or if any authenticated user can access it.
+- `review_bypass_allowed` (Boolean) Set to `true` to let a super admin run their own query that hasn't met the `reviews_required` on its credential, by explicitly acknowledging the override. Only a super admin can, holding approve on the database is not enough, and every bypass is recorded against the query, shown in the audit log, and posted to `slack_channel`. Defaults to `false`.
 - `slack_channel` (String) The slack channel to send query request notifications to.
 - `ssl` (Boolean) Set to `true` to turn on ssl connections for this database.
 - `verify_server_hostname` (Boolean) Set to `true` to also verify that the server certificate matches the `hostname` being connected to (Postgres `sslmode=verify-full`). Requires `cacertfile`; without it the connection is encrypt-only and nothing is verified. Leave `false` for managed services that present a certificate not matching the endpoint hostname.
