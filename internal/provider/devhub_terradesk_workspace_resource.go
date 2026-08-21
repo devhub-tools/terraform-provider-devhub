@@ -8,6 +8,7 @@ import (
 	"fmt"
 	devhub "terraform-provider-devhub/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -18,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -46,6 +48,8 @@ type terradeskWorkspaceResourceModel struct {
 	CpuRequests           types.String           `tfsdk:"cpu_requests"`
 	MemoryRequests        types.String           `tfsdk:"memory_requests"`
 	AgentId               types.String           `tfsdk:"agent_id"`
+	SlackChannel          types.String           `tfsdk:"slack_channel"`
+	SlackNotifyOn         types.String           `tfsdk:"slack_notify_on"`
 	WorkloadIdentity      *workloadIdentityModel `tfsdk:"workload_identity"`
 	EnvVars               []envVarModel          `tfsdk:"env_vars"`
 	Secrets               []secretModel          `tfsdk:"secrets"`
@@ -151,6 +155,19 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 			"agent_id": schema.StringAttribute{
 				MarkdownDescription: "The agent id for the database.",
 				Optional:            true,
+			},
+			"slack_channel": schema.StringAttribute{
+				MarkdownDescription: "The slack channel to post to when a plan finishes and is waiting on a human. The message is reacted on as the plan moves: ✅ once it can apply, 🚀 once applied, ❌ once canceled. Scheduled plans post to their schedule's channel instead. Requires the Slack integration.",
+				Optional:            true,
+			},
+			"slack_notify_on": schema.StringAttribute{
+				MarkdownDescription: "Which plans post to `slack_channel`: `all_plans` or `default_branch` for only plans on the repository's default branch. Defaults to `all_plans`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("all_plans"),
+				Validators: []validator.String{
+					stringvalidator.OneOf("all_plans", "default_branch"),
+				},
 			},
 			"workload_identity": schema.SingleNestedAttribute{
 				Optional: true,
@@ -335,6 +352,8 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 		CpuRequests:           plan.CpuRequests.ValueString(),
 		MemoryRequests:        plan.MemoryRequests.ValueString(),
 		AgentId:               plan.AgentId.ValueString(),
+		SlackChannel:          plan.SlackChannel.ValueString(),
+		SlackNotifyOn:         plan.SlackNotifyOn.ValueString(),
 		EnvVars:               envVars,
 		Secrets:               secrets,
 		InitContainers:        initContainers,
@@ -436,6 +455,14 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 		state.AgentId = types.StringNull()
 	}
 
+	if workspace.SlackChannel != "" {
+		state.SlackChannel = types.StringValue(workspace.SlackChannel)
+	} else {
+		state.SlackChannel = types.StringNull()
+	}
+
+	state.SlackNotifyOn = types.StringValue(workspace.SlackNotifyOn)
+
 	if state.EnvVars == nil || len(state.EnvVars) != len(workspace.EnvVars) {
 		state.EnvVars = make([]envVarModel, len(workspace.EnvVars))
 	}
@@ -523,6 +550,8 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 		CpuRequests:           plan.CpuRequests.ValueString(),
 		MemoryRequests:        plan.MemoryRequests.ValueString(),
 		AgentId:               plan.AgentId.ValueString(),
+		SlackChannel:          plan.SlackChannel.ValueString(),
+		SlackNotifyOn:         plan.SlackNotifyOn.ValueString(),
 		EnvVars:               envVars,
 		Secrets:               secrets,
 		InitContainers:        initContainers,

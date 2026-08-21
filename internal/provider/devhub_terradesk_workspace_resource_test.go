@@ -198,3 +198,49 @@ resource "devhub_terradesk_workspace" "test" {
 }
 `, image)
 }
+
+func TestAccWorkspaceWithSlackNotificationsResource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: testAccWorkspaceWithSlackNotificationsResourceConfig("all_plans"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "slack_channel", "#terraform"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "slack_notify_on", "all_plans"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "devhub_terradesk_workspace.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			// Update and Read testing
+			{
+				Config: testAccWorkspaceWithSlackNotificationsResourceConfig("default_branch"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "slack_notify_on", "default_branch"),
+					// everything else should be the same
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "slack_channel", "#terraform"),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func testAccWorkspaceWithSlackNotificationsResourceConfig(notifyOn string) string {
+	return providerConfig + fmt.Sprintf(`
+resource "devhub_terradesk_workspace" "test" {
+  name     		 = "my_workspace"
+  repository   = "devhub-tools/devhub"
+	path 				 = "terraform"
+	docker_image = "hashicorp/terraform:1.10"
+
+	slack_channel   = "#terraform"
+	slack_notify_on = %[1]q
+}
+`, notifyOn)
+}

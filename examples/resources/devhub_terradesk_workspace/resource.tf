@@ -7,6 +7,10 @@ resource "devhub_terradesk_workspace" "example" {
   # wrap every terraform command in `op run` so 1Password resolves op:// references
   command = "/home/terradesk/bin/op run -- terraform"
 
+  # post to slack when a plan is waiting on a human, main branch only
+  slack_channel   = "#terraform"
+  slack_notify_on = "default_branch"
+
   # stage the op binary onto the shared volume before terraform init runs
   init_containers = [
     {

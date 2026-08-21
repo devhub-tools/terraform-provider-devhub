@@ -22,6 +22,10 @@ resource "devhub_terradesk_workspace" "example" {
   # wrap every terraform command in `op run` so 1Password resolves op:// references
   command = "/home/terradesk/bin/op run -- terraform"
 
+  # post to slack when a plan is waiting on a human, main branch only
+  slack_channel   = "#terraform"
+  slack_notify_on = "default_branch"
+
   # stage the op binary onto the shared volume before terraform init runs
   init_containers = [
     {
@@ -102,6 +106,8 @@ resource "google_iam_workload_identity_pool_provider" "devhub" {
 - `required_approvals` (Number) Specify how many reviews are required to apply plans.
 - `run_plans_automatically` (Boolean) Whether to run plans automatically for PRs and pushes. Make sure to consider who can push to your GitHub repository if you have this setting on as it could grant sensitive access.
 - `secrets` (Attributes List) (see [below for nested schema](#nestedatt--secrets))
+- `slack_channel` (String) The slack channel to post to when a plan finishes and is waiting on a human. The message is reacted on as the plan moves: ✅ once it can apply, 🚀 once applied, ❌ once canceled. Scheduled plans post to their schedule's channel instead. Requires the Slack integration.
+- `slack_notify_on` (String) Which plans post to `slack_channel`: `all_plans` or `default_branch` for only plans on the repository's default branch. Defaults to `all_plans`.
 - `workload_identity` (Attributes) (see [below for nested schema](#nestedatt--workload_identity))
 
 ### Read-Only

@@ -45,6 +45,8 @@ type TerradeskWorkspace struct {
 	CpuRequests           string            `json:"cpu_requests"`
 	MemoryRequests        string            `json:"memory_requests"`
 	AgentId               string            `json:"agent_id"`
+	SlackChannel          string            `json:"slack_channel"`
+	SlackNotifyOn         string            `json:"slack_notify_on"`
 	WorkloadIdentity      *WorkloadIdentity `json:"workload_identity"`
 	EnvVars               []EnvVar          `json:"env_vars"`
 	Secrets               []Secret          `json:"secrets"`
