@@ -50,6 +50,9 @@ type terradeskWorkspaceResourceModel struct {
 	AgentId               types.String           `tfsdk:"agent_id"`
 	SlackChannel          types.String           `tfsdk:"slack_channel"`
 	SlackNotifyOn         types.String           `tfsdk:"slack_notify_on"`
+	DriftDetectionEnabled types.Bool             `tfsdk:"drift_detection_enabled"`
+	DriftCronExpression   types.String           `tfsdk:"drift_cron_expression"`
+	DriftSlackChannel     types.String           `tfsdk:"drift_slack_channel"`
 	WorkloadIdentity      *workloadIdentityModel `tfsdk:"workload_identity"`
 	EnvVars               []envVarModel          `tfsdk:"env_vars"`
 	Secrets               []secretModel          `tfsdk:"secrets"`
@@ -157,7 +160,21 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 				Optional:            true,
 			},
 			"slack_channel": schema.StringAttribute{
-				MarkdownDescription: "The slack channel to post to when a plan finishes and is waiting on a human. The message is reacted on as the plan moves: ✅ once it can apply, 🚀 once applied, ❌ once canceled. Scheduled plans post to their schedule's channel instead. Requires the Slack integration.",
+				MarkdownDescription: "The slack channel to post to when a plan finishes and is waiting on a human. The message is reacted on as the plan moves: ✅ once it can apply, 🚀 once applied, ❌ once canceled. Drift runs post to `drift_slack_channel` instead. Requires the Slack integration.",
+				Optional:            true,
+			},
+			"drift_detection_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Run `terraform plan -refresh-only` against the default branch on a schedule and report what changed outside Terraform. A drift run never applies and never waits on approval. Requires `drift_cron_expression`. Defaults to `false`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"drift_cron_expression": schema.StringAttribute{
+				MarkdownDescription: "Cron expression, in UTC, deciding how often drift detection runs (e.g. `0 2 * * *`). Required when `drift_detection_enabled` is true. A workspace that has never been checked runs as soon as it is enabled.",
+				Optional:            true,
+			},
+			"drift_slack_channel": schema.StringAttribute{
+				MarkdownDescription: "The slack channel a drift run posts to, and only when it finds drift. Leave unset for no notification. Requires the Slack integration.",
 				Optional:            true,
 			},
 			"slack_notify_on": schema.StringAttribute{
@@ -354,6 +371,9 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 		AgentId:               plan.AgentId.ValueString(),
 		SlackChannel:          plan.SlackChannel.ValueString(),
 		SlackNotifyOn:         plan.SlackNotifyOn.ValueString(),
+		DriftDetectionEnabled: plan.DriftDetectionEnabled.ValueBool(),
+		DriftCronExpression:   plan.DriftCronExpression.ValueString(),
+		DriftSlackChannel:     plan.DriftSlackChannel.ValueString(),
 		EnvVars:               envVars,
 		Secrets:               secrets,
 		InitContainers:        initContainers,
@@ -463,6 +483,20 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 
 	state.SlackNotifyOn = types.StringValue(workspace.SlackNotifyOn)
 
+	state.DriftDetectionEnabled = types.BoolValue(workspace.DriftDetectionEnabled)
+
+	if workspace.DriftCronExpression != "" {
+		state.DriftCronExpression = types.StringValue(workspace.DriftCronExpression)
+	} else {
+		state.DriftCronExpression = types.StringNull()
+	}
+
+	if workspace.DriftSlackChannel != "" {
+		state.DriftSlackChannel = types.StringValue(workspace.DriftSlackChannel)
+	} else {
+		state.DriftSlackChannel = types.StringNull()
+	}
+
 	if state.EnvVars == nil || len(state.EnvVars) != len(workspace.EnvVars) {
 		state.EnvVars = make([]envVarModel, len(workspace.EnvVars))
 	}
@@ -552,6 +586,9 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 		AgentId:               plan.AgentId.ValueString(),
 		SlackChannel:          plan.SlackChannel.ValueString(),
 		SlackNotifyOn:         plan.SlackNotifyOn.ValueString(),
+		DriftDetectionEnabled: plan.DriftDetectionEnabled.ValueBool(),
+		DriftCronExpression:   plan.DriftCronExpression.ValueString(),
+		DriftSlackChannel:     plan.DriftSlackChannel.ValueString(),
 		EnvVars:               envVars,
 		Secrets:               secrets,
 		InitContainers:        initContainers,

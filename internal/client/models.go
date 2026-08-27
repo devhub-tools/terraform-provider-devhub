@@ -47,6 +47,9 @@ type TerradeskWorkspace struct {
 	AgentId               string            `json:"agent_id"`
 	SlackChannel          string            `json:"slack_channel"`
 	SlackNotifyOn         string            `json:"slack_notify_on"`
+	DriftDetectionEnabled bool              `json:"drift_detection_enabled"`
+	DriftCronExpression   string            `json:"drift_cron_expression"`
+	DriftSlackChannel     string            `json:"drift_slack_channel"`
 	WorkloadIdentity      *WorkloadIdentity `json:"workload_identity"`
 	EnvVars               []EnvVar          `json:"env_vars"`
 	Secrets               []Secret          `json:"secrets"`

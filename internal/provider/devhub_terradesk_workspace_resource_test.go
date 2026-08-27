@@ -244,3 +244,71 @@ resource "devhub_terradesk_workspace" "test" {
 }
 `, notifyOn)
 }
+
+func TestAccWorkspaceWithDriftDetectionResource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// drift detection defaults to off, and the schedule stays unset with it
+			{
+				Config: testAccWorkspaceWithoutDriftDetectionResourceConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "drift_detection_enabled", "false"),
+					resource.TestCheckNoResourceAttr("devhub_terradesk_workspace.test", "drift_cron_expression"),
+				),
+			},
+			// Create and Read testing
+			{
+				Config: testAccWorkspaceWithDriftDetectionResourceConfig("0 2 * * *"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "drift_detection_enabled", "true"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "drift_cron_expression", "0 2 * * *"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "drift_slack_channel", "#infra-alerts"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "devhub_terradesk_workspace.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			// Update and Read testing
+			{
+				Config: testAccWorkspaceWithDriftDetectionResourceConfig("0 */6 * * *"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "drift_cron_expression", "0 */6 * * *"),
+					// everything else should be the same
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "drift_detection_enabled", "true"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "drift_slack_channel", "#infra-alerts"),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func testAccWorkspaceWithoutDriftDetectionResourceConfig() string {
+	return providerConfig + `
+resource "devhub_terradesk_workspace" "test" {
+  name     		 = "my_workspace"
+  repository   = "devhub-tools/devhub"
+	path 				 = "terraform"
+	docker_image = "hashicorp/terraform:1.10"
+}
+`
+}
+
+func testAccWorkspaceWithDriftDetectionResourceConfig(cron string) string {
+	return providerConfig + fmt.Sprintf(`
+resource "devhub_terradesk_workspace" "test" {
+  name     		 = "my_workspace"
+  repository   = "devhub-tools/devhub"
+	path 				 = "terraform"
+	docker_image = "hashicorp/terraform:1.10"
+
+	drift_detection_enabled = true
+	drift_cron_expression   = %[1]q
+	drift_slack_channel     = "#infra-alerts"
+}
+`, cron)
+}

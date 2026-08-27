@@ -26,6 +26,11 @@ resource "devhub_terradesk_workspace" "example" {
   slack_channel   = "#terraform"
   slack_notify_on = "default_branch"
 
+  # nightly refresh-only run reporting anything changed outside terraform
+  drift_detection_enabled = true
+  drift_cron_expression   = "0 2 * * *"
+  drift_slack_channel     = "#infra-alerts"
+
   # stage the op binary onto the shared volume before terraform init runs
   init_containers = [
     {
@@ -98,6 +103,9 @@ resource "google_iam_workload_identity_pool_provider" "devhub" {
 - `agent_id` (String) The agent id for the database.
 - `command` (String) Replaces the image's entrypoint for the init, plan and apply containers, for example: `op run -- terraform`. The terraform arguments are appended to it. Leave unset to use the image's own entrypoint.
 - `cpu_requests` (String) How much cpu should be requested for the pod scheduled by the job, see kubernetes docs for allowable values.
+- `drift_cron_expression` (String) Cron expression, in UTC, deciding how often drift detection runs (e.g. `0 2 * * *`). Required when `drift_detection_enabled` is true. A workspace that has never been checked runs as soon as it is enabled.
+- `drift_detection_enabled` (Boolean) Run `terraform plan -refresh-only` against the default branch on a schedule and report what changed outside Terraform. A drift run never applies and never waits on approval. Requires `drift_cron_expression`. Defaults to `false`.
+- `drift_slack_channel` (String) The slack channel a drift run posts to, and only when it finds drift. Leave unset for no notification. Requires the Slack integration.
 - `env_vars` (Attributes List) (see [below for nested schema](#nestedatt--env_vars))
 - `init_args` (String) Args to pass to the init command.
 - `init_containers` (Attributes List) Containers that run after the repository is checked out and before `terraform init`, in the order listed. Use them to stage tooling the terraform containers need. They share the `/workspace` and `/home/terradesk` volumes and the same environment. A binary staged here must be statically linked, or built against the same libc as the terraform image (Alpine/musl). (see [below for nested schema](#nestedatt--init_containers))
@@ -106,7 +114,7 @@ resource "google_iam_workload_identity_pool_provider" "devhub" {
 - `required_approvals` (Number) Specify how many reviews are required to apply plans.
 - `run_plans_automatically` (Boolean) Whether to run plans automatically for PRs and pushes. Make sure to consider who can push to your GitHub repository if you have this setting on as it could grant sensitive access.
 - `secrets` (Attributes List) (see [below for nested schema](#nestedatt--secrets))
-- `slack_channel` (String) The slack channel to post to when a plan finishes and is waiting on a human. The message is reacted on as the plan moves: ✅ once it can apply, 🚀 once applied, ❌ once canceled. Scheduled plans post to their schedule's channel instead. Requires the Slack integration.
+- `slack_channel` (String) The slack channel to post to when a plan finishes and is waiting on a human. The message is reacted on as the plan moves: ✅ once it can apply, 🚀 once applied, ❌ once canceled. Drift runs post to `drift_slack_channel` instead. Requires the Slack integration.
 - `slack_notify_on` (String) Which plans post to `slack_channel`: `all_plans` or `default_branch` for only plans on the repository's default branch. Defaults to `all_plans`.
 - `workload_identity` (Attributes) (see [below for nested schema](#nestedatt--workload_identity))
 

@@ -11,6 +11,11 @@ resource "devhub_terradesk_workspace" "example" {
   slack_channel   = "#terraform"
   slack_notify_on = "default_branch"
 
+  # nightly refresh-only run reporting anything changed outside terraform
+  drift_detection_enabled = true
+  drift_cron_expression   = "0 2 * * *"
+  drift_slack_channel     = "#infra-alerts"
+
   # stage the op binary onto the shared volume before terraform init runs
   init_containers = [
     {
