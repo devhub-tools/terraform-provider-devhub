@@ -90,7 +90,7 @@ func TestAccWorkspaceWithWorkloadIdentityResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_workspace"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.enabled", "true"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.service_account_email", "devhub@google.com"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "projects/123456789/locations/global/workloadIdentityPools/pools/devhub/providers/devhub"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "projects/123456789/locations/global/workloadIdentityPools/devhub/providers/devhub"),
 				),
 			},
 			// ImportState testing
@@ -107,7 +107,7 @@ func TestAccWorkspaceWithWorkloadIdentityResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "name", "my_workspace"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.enabled", "true"),
 					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.service_account_email", "serviceaccount@google.com"),
-					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "projects/123456789/locations/global/workloadIdentityPools/pools/devhub/providers/devhub"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "workload_identity.provider", "projects/123456789/locations/global/workloadIdentityPools/devhub/providers/devhub"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -126,7 +126,7 @@ resource "devhub_terradesk_workspace" "test" {
 	workload_identity = {
 		enabled             = true
 		service_account_email = %[1]q
-		provider            = "projects/123456789/locations/global/workloadIdentityPools/pools/devhub/providers/devhub"
+		provider            = "projects/123456789/locations/global/workloadIdentityPools/devhub/providers/devhub"
 	}
 }
 `, email)
@@ -197,6 +197,56 @@ resource "devhub_terradesk_workspace" "test" {
 	]
 }
 `, image)
+}
+
+func TestAccWorkspaceWithTriggerPathsResource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: testAccWorkspaceWithTriggerPathsResourceConfig("config/prod"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "path", "terraform/prod"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "trigger_paths.0.path", "config/prod"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "trigger_paths.1.path", "modules/shared"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "devhub_terradesk_workspace.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			// Update and Read testing
+			{
+				Config: testAccWorkspaceWithTriggerPathsResourceConfig("config/production"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "trigger_paths.0.path", "config/production"),
+					// the workspace path is unaffected by its trigger paths
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "path", "terraform/prod"),
+					resource.TestCheckResourceAttr("devhub_terradesk_workspace.test", "trigger_paths.1.path", "modules/shared"),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func testAccWorkspaceWithTriggerPathsResourceConfig(path string) string {
+	return providerConfig + fmt.Sprintf(`
+resource "devhub_terradesk_workspace" "test" {
+  name     		 = "my_workspace"
+  repository   = "devhub-tools/devhub"
+	path 				 = "terraform/prod"
+	docker_image = "hashicorp/terraform:1.10"
+
+	trigger_paths = [
+		{ path = %[1]q },
+		{ path = "modules/shared" }
+	]
+}
+`, path)
 }
 
 func TestAccWorkspaceWithSlackNotificationsResource(t *testing.T) {

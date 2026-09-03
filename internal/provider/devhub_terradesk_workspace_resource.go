@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	devhub "terraform-provider-devhub/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -57,6 +58,7 @@ type terradeskWorkspaceResourceModel struct {
 	EnvVars               []envVarModel          `tfsdk:"env_vars"`
 	Secrets               []secretModel          `tfsdk:"secrets"`
 	InitContainers        []initContainerModel   `tfsdk:"init_containers"`
+	TriggerPaths          []triggerPathModel     `tfsdk:"trigger_paths"`
 }
 
 type workloadIdentityModel struct {
@@ -69,6 +71,10 @@ type initContainerModel struct {
 	Name    types.String `tfsdk:"name"`
 	Image   types.String `tfsdk:"image"`
 	Command types.String `tfsdk:"command"`
+}
+
+type triggerPathModel struct {
+	Path types.String `tfsdk:"path"`
 }
 
 type envVarModel struct {
@@ -275,6 +281,38 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 					},
 				},
 			},
+			"trigger_paths": schema.ListNestedAttribute{
+				MarkdownDescription: "Additional repository paths that also start a plan when a push or pull request changes a file under one of them. Additive and prefix-matched, exactly like `path`: declaring these never stops `path` itself from triggering, and a workspace with no `path` still plans on any change. Only decides whether to plan — the terraform working directory is always `path`. Use them when the terraform lives in one folder but the files it reads live in another.",
+				Optional:            true,
+				Computed:            true,
+				Default: listdefault.StaticValue(
+					types.ListValueMust(
+						types.ObjectType{
+							AttrTypes: map[string]attr.Type{
+								"path": types.StringType,
+							},
+						},
+						[]attr.Value{},
+					),
+				),
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"path": schema.StringAttribute{
+							MarkdownDescription: "Repository path, for example: `config/prod`. Cannot be blank.",
+							Required:            true,
+							Validators: []validator.String{
+								// Required alone still admits "" and "   ", and a blank path is a
+								// prefix of every file, so it would plan on every push. The API
+								// trims and rejects it; catching it at plan time saves the round trip.
+								stringvalidator.RegexMatches(
+									regexp.MustCompile(`\S`),
+									"must not be blank",
+								),
+							},
+						},
+					},
+				},
+			},
 			"secrets": schema.ListNestedAttribute{
 				Optional: true,
 				Computed: true,
@@ -357,6 +395,13 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 		})
 	}
 
+	var triggerPaths []devhub.TriggerPath
+	for _, triggerPath := range plan.TriggerPaths {
+		triggerPaths = append(triggerPaths, devhub.TriggerPath{
+			Path: triggerPath.Path.ValueString(),
+		})
+	}
+
 	input := devhub.TerradeskWorkspace{
 		Name:                  plan.Name.ValueString(),
 		Repository:            plan.Repository.ValueString(),
@@ -377,6 +422,7 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 		EnvVars:               envVars,
 		Secrets:               secrets,
 		InitContainers:        initContainers,
+		TriggerPaths:          triggerPaths,
 	}
 
 	if plan.WorkloadIdentity != nil {
@@ -527,6 +573,14 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 		state.InitContainers[index].Command = types.StringValue(initContainer.Command)
 	}
 
+	if state.TriggerPaths == nil || len(state.TriggerPaths) != len(workspace.TriggerPaths) {
+		state.TriggerPaths = make([]triggerPathModel, len(workspace.TriggerPaths))
+	}
+
+	for index, triggerPath := range workspace.TriggerPaths {
+		state.TriggerPaths[index].Path = types.StringValue(triggerPath.Path)
+	}
+
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -572,6 +626,13 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 		})
 	}
 
+	var triggerPaths []devhub.TriggerPath
+	for _, triggerPath := range plan.TriggerPaths {
+		triggerPaths = append(triggerPaths, devhub.TriggerPath{
+			Path: triggerPath.Path.ValueString(),
+		})
+	}
+
 	input := devhub.TerradeskWorkspace{
 		Name:                  plan.Name.ValueString(),
 		Repository:            plan.Repository.ValueString(),
@@ -592,6 +653,7 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 		EnvVars:               envVars,
 		Secrets:               secrets,
 		InitContainers:        initContainers,
+		TriggerPaths:          triggerPaths,
 	}
 
 	if plan.WorkloadIdentity != nil {

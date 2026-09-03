@@ -54,6 +54,7 @@ type TerradeskWorkspace struct {
 	EnvVars               []EnvVar          `json:"env_vars"`
 	Secrets               []Secret          `json:"secrets"`
 	InitContainers        []InitContainer   `json:"init_containers"`
+	TriggerPaths          []TriggerPath     `json:"trigger_paths"`
 }
 
 type WorkloadIdentity struct {
@@ -72,6 +73,10 @@ type InitContainer struct {
 	Name    string `json:"name"`
 	Image   string `json:"image"`
 	Command string `json:"command"`
+}
+
+type TriggerPath struct {
+	Path string `json:"path"`
 }
 
 type Secret struct {

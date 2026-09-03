@@ -116,6 +116,7 @@ resource "google_iam_workload_identity_pool_provider" "devhub" {
 - `secrets` (Attributes List) (see [below for nested schema](#nestedatt--secrets))
 - `slack_channel` (String) The slack channel to post to when a plan finishes and is waiting on a human. The message is reacted on as the plan moves: ✅ once it can apply, 🚀 once applied, ❌ once canceled. Drift runs post to `drift_slack_channel` instead. Requires the Slack integration.
 - `slack_notify_on` (String) Which plans post to `slack_channel`: `all_plans` or `default_branch` for only plans on the repository's default branch. Defaults to `all_plans`.
+- `trigger_paths` (Attributes List) Additional repository paths that also start a plan when a push or pull request changes a file under one of them. Additive and prefix-matched, exactly like `path`: declaring these never stops `path` itself from triggering, and a workspace with no `path` still plans on any change. Only decides whether to plan — the terraform working directory is always `path`. Use them when the terraform lives in one folder but the files it reads live in another. (see [below for nested schema](#nestedatt--trigger_paths))
 - `workload_identity` (Attributes) (see [below for nested schema](#nestedatt--workload_identity))
 
 ### Read-Only
@@ -163,6 +164,14 @@ Optional:
 Read-Only:
 
 - `id` (String) Secret id.
+
+
+<a id="nestedatt--trigger_paths"></a>
+### Nested Schema for `trigger_paths`
+
+Required:
+
+- `path` (String) Repository path, for example: `config/prod`. Cannot be blank.
 
 
 <a id="nestedatt--workload_identity"></a>

@@ -40,6 +40,10 @@ func (c *Client) CreateWorkspace(input TerradeskWorkspace) (*TerradeskWorkspace,
 		input.InitContainers = make([]InitContainer, 0)
 	}
 
+	if input.TriggerPaths == nil {
+		input.TriggerPaths = make([]TriggerPath, 0)
+	}
+
 	rb, err := json.Marshal(input)
 	if err != nil {
 		return nil, err
@@ -75,6 +79,10 @@ func (c *Client) UpdateWorkspace(workspaceId string, input TerradeskWorkspace) (
 
 	if input.InitContainers == nil {
 		input.InitContainers = make([]InitContainer, 0)
+	}
+
+	if input.TriggerPaths == nil {
+		input.TriggerPaths = make([]TriggerPath, 0)
 	}
 
 	rb, err := json.Marshal(input)
