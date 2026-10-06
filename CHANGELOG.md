@@ -1,3 +1,9 @@
+## 2.44.1 (October 5, 2026)
+
+NOTES:
+
+* Update Go and all dependencies to their latest versions. Tested through Terraform 1.16.
+
 ## 2.44.0 (October 5, 2026)
 
 BREAKING CHANGES:
