@@ -16,10 +16,17 @@ type Database struct {
 	ReviewBypassAllowed  bool                 `json:"review_bypass_allowed"`
 	Group                string               `json:"group"`
 	SlackChannel         string               `json:"slack_channel"`
-	AgentId              string               `json:"agent_id"`
+	TunnelId             string               `json:"tunnel_id"`
 	AiEnabled            bool                 `json:"ai_enabled"`
 	AiMaxRows            int64                `json:"ai_max_rows"`
 	Credentials          []DatabaseCredential `json:"credentials"`
+	// Always sent as a list, never null: the API replaces the database's list with it.
+	ConnectionParameters []ConnectionParameter `json:"connection_parameters"`
+}
+
+type ConnectionParameter struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type DatabaseCredential struct {
@@ -44,7 +51,7 @@ type TerradeskWorkspace struct {
 	Command               string            `json:"command"`
 	CpuRequests           string            `json:"cpu_requests"`
 	MemoryRequests        string            `json:"memory_requests"`
-	AgentId               string            `json:"agent_id"`
+	TunnelId              string            `json:"tunnel_id"`
 	SlackChannel          string            `json:"slack_channel"`
 	SlackNotifyOn         string            `json:"slack_notify_on"`
 	DriftDetectionEnabled bool              `json:"drift_detection_enabled"`

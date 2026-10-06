@@ -34,26 +34,32 @@ func DatabaseResource() resource.Resource {
 
 // DatabaseResourceModel describes the resource data model.
 type databaseResourceModel struct {
-	Id                   types.String              `tfsdk:"id"`
-	Name                 types.String              `tfsdk:"name"`
-	Adapter              types.String              `tfsdk:"adapter"`
-	Hostname             types.String              `tfsdk:"hostname"`
-	Port                 types.Int64               `tfsdk:"port"`
-	Database             types.String              `tfsdk:"database"`
-	Ssl                  types.Bool                `tfsdk:"ssl"`
-	Cacertfile           types.String              `tfsdk:"cacertfile"`
-	Keyfile              types.String              `tfsdk:"keyfile"`
-	Certfile             types.String              `tfsdk:"certfile"`
-	VerifyServerHostname types.Bool                `tfsdk:"verify_server_hostname"`
-	RestrictAccess       types.Bool                `tfsdk:"restrict_access"`
-	ReviewBypassAllowed  types.Bool                `tfsdk:"review_bypass_allowed"`
-	Group                types.String              `tfsdk:"group"`
-	SlackChannel         types.String              `tfsdk:"slack_channel"`
-	AgentId              types.String              `tfsdk:"agent_id"`
-	AiEnabled            types.Bool                `tfsdk:"ai_enabled"`
-	AiMaxRows            types.Int64               `tfsdk:"ai_max_rows"`
-	Credentials          []databaseCredentialModel `tfsdk:"credentials"`
-	CredentialIds        types.Map                 `tfsdk:"credential_ids"`
+	Id                   types.String               `tfsdk:"id"`
+	Name                 types.String               `tfsdk:"name"`
+	Adapter              types.String               `tfsdk:"adapter"`
+	Hostname             types.String               `tfsdk:"hostname"`
+	Port                 types.Int64                `tfsdk:"port"`
+	Database             types.String               `tfsdk:"database"`
+	Ssl                  types.Bool                 `tfsdk:"ssl"`
+	Cacertfile           types.String               `tfsdk:"cacertfile"`
+	Keyfile              types.String               `tfsdk:"keyfile"`
+	Certfile             types.String               `tfsdk:"certfile"`
+	VerifyServerHostname types.Bool                 `tfsdk:"verify_server_hostname"`
+	RestrictAccess       types.Bool                 `tfsdk:"restrict_access"`
+	ReviewBypassAllowed  types.Bool                 `tfsdk:"review_bypass_allowed"`
+	Group                types.String               `tfsdk:"group"`
+	SlackChannel         types.String               `tfsdk:"slack_channel"`
+	TunnelId             types.String               `tfsdk:"tunnel_id"`
+	AiEnabled            types.Bool                 `tfsdk:"ai_enabled"`
+	AiMaxRows            types.Int64                `tfsdk:"ai_max_rows"`
+	Credentials          []databaseCredentialModel  `tfsdk:"credentials"`
+	CredentialIds        types.Map                  `tfsdk:"credential_ids"`
+	ConnectionParameters []connectionParameterModel `tfsdk:"connection_parameters"`
+}
+
+type connectionParameterModel struct {
+	Name  types.String `tfsdk:"name"`
+	Value types.String `tfsdk:"value"`
 }
 
 type databaseCredentialModel struct {
@@ -154,8 +160,8 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				MarkdownDescription: "The slack channel to send query request notifications to.",
 				Optional:            true,
 			},
-			"agent_id": schema.StringAttribute{
-				MarkdownDescription: "The agent id for the database.",
+			"tunnel_id": schema.StringAttribute{
+				MarkdownDescription: "The id of the Tunnel Devhub uses to reach the database.",
 				Optional:            true,
 			},
 			"ai_enabled": schema.BoolAttribute{
@@ -169,6 +175,22 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional:            true,
 				Computed:            true,
 				Default:             int64default.StaticInt64(500),
+			},
+			"connection_parameters": schema.ListNestedAttribute{
+				MarkdownDescription: "Names and values sent to the server when a connection opens, which Postgres calls startup parameters, in this order. They apply to every credential: Test Connection, queries and proxy sessions. Only a `POSTGRES` database sends them. A name can't be `user` or `database`. Leaving this unset, or setting it to an empty list, removes any the database has.",
+				Optional:            true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							MarkdownDescription: "The parameter's name, for example `pgdog.role` or `options`.",
+							Required:            true,
+						},
+						"value": schema.StringAttribute{
+							MarkdownDescription: "The parameter's value, for example `replica` or `-c pgdog.role=replica`.",
+							Required:            true,
+						},
+					},
+				},
 			},
 			"credential_ids": schema.MapAttribute{
 				ElementType:         types.StringType,
@@ -246,7 +268,7 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 	model.Port = types.Int64Null()
 	model.Group = types.StringNull()
 	model.SlackChannel = types.StringNull()
-	model.AgentId = types.StringNull()
+	model.TunnelId = types.StringNull()
 
 	if database.Port != nil {
 		model.Port = types.Int64Value(*database.Port)
@@ -260,8 +282,8 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 		model.SlackChannel = types.StringValue(database.SlackChannel)
 	}
 
-	if database.AgentId != "" {
-		model.AgentId = types.StringValue(database.AgentId)
+	if database.TunnelId != "" {
+		model.TunnelId = types.StringValue(database.TunnelId)
 	}
 
 	if model.Credentials == nil || len(model.Credentials) != len(database.Credentials) {
@@ -287,6 +309,30 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 	}
 
 	model.CredentialIds = types.MapValueMust(types.StringType, credentialIds)
+
+	// A database with none reads back as an empty list. The model keeps whichever of
+	// unset and `[]` the configuration has, so neither shows a change on the next plan.
+	if len(database.ConnectionParameters) > 0 || model.ConnectionParameters != nil {
+		model.ConnectionParameters = make([]connectionParameterModel, len(database.ConnectionParameters))
+	}
+
+	for index, parameter := range database.ConnectionParameters {
+		model.ConnectionParameters[index].Name = types.StringValue(parameter.Name)
+		model.ConnectionParameters[index].Value = types.StringValue(parameter.Value)
+	}
+}
+
+func connectionParametersFromModel(model []connectionParameterModel) []devhub.ConnectionParameter {
+	parameters := make([]devhub.ConnectionParameter, 0, len(model))
+
+	for _, parameter := range model {
+		parameters = append(parameters, devhub.ConnectionParameter{
+			Name:  parameter.Name.ValueString(),
+			Value: parameter.Value.ValueString(),
+		})
+	}
+
+	return parameters
 }
 
 func (r *databaseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -337,10 +383,11 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		ReviewBypassAllowed:  plan.ReviewBypassAllowed.ValueBool(),
 		Group:                plan.Group.ValueString(),
 		SlackChannel:         plan.SlackChannel.ValueString(),
-		AgentId:              plan.AgentId.ValueString(),
+		TunnelId:             plan.TunnelId.ValueString(),
 		AiEnabled:            plan.AiEnabled.ValueBool(),
 		AiMaxRows:            plan.AiMaxRows.ValueInt64(),
 		Credentials:          credentials,
+		ConnectionParameters: connectionParametersFromModel(plan.ConnectionParameters),
 	}
 
 	database, err := r.client.CreateDatabase(input)
@@ -446,10 +493,11 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		ReviewBypassAllowed:  plan.ReviewBypassAllowed.ValueBool(),
 		Group:                plan.Group.ValueString(),
 		SlackChannel:         plan.SlackChannel.ValueString(),
-		AgentId:              plan.AgentId.ValueString(),
+		TunnelId:             plan.TunnelId.ValueString(),
 		AiEnabled:            plan.AiEnabled.ValueBool(),
 		AiMaxRows:            plan.AiMaxRows.ValueInt64(),
 		Credentials:          credentials,
+		ConnectionParameters: connectionParametersFromModel(plan.ConnectionParameters),
 	}
 
 	// Update existing order

@@ -100,7 +100,6 @@ resource "google_iam_workload_identity_pool_provider" "devhub" {
 
 ### Optional
 
-- `agent_id` (String) The agent id for the database.
 - `command` (String) Replaces the image's entrypoint for the init, plan and apply containers, for example: `op run -- terraform`. The terraform arguments are appended to it. Leave unset to use the image's own entrypoint.
 - `cpu_requests` (String) How much cpu should be requested for the pod scheduled by the job, see kubernetes docs for allowable values.
 - `drift_cron_expression` (String) Cron expression, in UTC, deciding how often drift detection runs (e.g. `0 2 * * *`). Required when `drift_detection_enabled` is true. A workspace that has never been checked runs as soon as it is enabled.
@@ -117,6 +116,7 @@ resource "google_iam_workload_identity_pool_provider" "devhub" {
 - `slack_channel` (String) The slack channel to post to when a plan finishes and is waiting on a human. The message is reacted on as the plan moves: ✅ once it can apply, 🚀 once applied, ❌ once canceled. Drift runs post to `drift_slack_channel` instead. Requires the Slack integration.
 - `slack_notify_on` (String) Which plans post to `slack_channel`: `all_plans` or `default_branch` for only plans on the repository's default branch. Defaults to `all_plans`.
 - `trigger_paths` (Attributes List) Additional repository paths that also start a plan when a push or pull request changes a file under one of them. Additive and prefix-matched, exactly like `path`: declaring these never stops `path` itself from triggering, and a workspace with no `path` still plans on any change. Only decides whether to plan — the terraform working directory is always `path`. Use them when the terraform lives in one folder but the files it reads live in another. (see [below for nested schema](#nestedatt--trigger_paths))
+- `tunnel_id` (String) The id of the Tunnel Devhub uses to run the workspace's jobs.
 - `workload_identity` (Attributes) (see [below for nested schema](#nestedatt--workload_identity))
 
 ### Read-Only

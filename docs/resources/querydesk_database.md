@@ -22,6 +22,14 @@ resource "devhub_querydesk_database" "example" {
   ai_max_rows           = 500
   review_bypass_allowed = true
 
+  # Sent to the server when a connection opens. Here pgdog routes the database to the replica.
+  connection_parameters = [
+    {
+      name  = "pgdog.role"
+      value = "replica"
+    }
+  ]
+
   credentials = [
     {
       username           = "postgres"
@@ -48,11 +56,11 @@ resource "devhub_querydesk_database" "example" {
 
 ### Optional
 
-- `agent_id` (String) The agent id for the database.
 - `ai_enabled` (Boolean) Whether the AI agent may see and query this database. Opt-in, defaults to `false`.
 - `ai_max_rows` (Number) The maximum number of rows a single AI query may return against this database.
 - `cacertfile` (String, Sensitive) The server ca cert to use with ssl connections, `ssl` must be set to `true`.
 - `certfile` (String, Sensitive) The client cert to use with ssl connections, `ssl` must be set to `true`.
+- `connection_parameters` (Attributes List) Names and values sent to the server when a connection opens, which Postgres calls startup parameters, in this order. They apply to every credential: Test Connection, queries and proxy sessions. Only a `POSTGRES` database sends them. A name can't be `user` or `database`. Leaving this unset, or setting it to an empty list, removes any the database has. (see [below for nested schema](#nestedatt--connection_parameters))
 - `group` (String) The group this database belongs to, used for UI grouping.
 - `keyfile` (String, Sensitive) The client key to use with ssl connections, `ssl` must be set to `true`.
 - `port` (Number) The port to connect to the database on, if not specified the default port for the database type will be used.
@@ -60,6 +68,7 @@ resource "devhub_querydesk_database" "example" {
 - `review_bypass_allowed` (Boolean) Set to `true` to let a super admin run their own query that hasn't met the `reviews_required` on its credential, by explicitly acknowledging the override. Only a super admin can, holding approve on the database is not enough, and every bypass is recorded against the query, shown in the audit log, and posted to `slack_channel`. Defaults to `false`.
 - `slack_channel` (String) The slack channel to send query request notifications to.
 - `ssl` (Boolean) Set to `true` to turn on ssl connections for this database.
+- `tunnel_id` (String) The id of the Tunnel Devhub uses to reach the database.
 - `verify_server_hostname` (Boolean) Set to `true` to also verify that the server certificate matches the `hostname` being connected to (Postgres `sslmode=verify-full`). Requires `cacertfile`; without it the connection is encrypt-only and nothing is verified. Leave `false` for managed services that present a certificate not matching the endpoint hostname.
 
 ### Read-Only
@@ -85,3 +94,12 @@ Optional:
 Read-Only:
 
 - `id` (String) Credential id.
+
+
+<a id="nestedatt--connection_parameters"></a>
+### Nested Schema for `connection_parameters`
+
+Required:
+
+- `name` (String) The parameter's name, for example `pgdog.role` or `options`.
+- `value` (String) The parameter's value, for example `replica` or `-c pgdog.role=replica`.

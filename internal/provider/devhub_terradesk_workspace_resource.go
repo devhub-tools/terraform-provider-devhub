@@ -48,7 +48,7 @@ type terradeskWorkspaceResourceModel struct {
 	Command               types.String           `tfsdk:"command"`
 	CpuRequests           types.String           `tfsdk:"cpu_requests"`
 	MemoryRequests        types.String           `tfsdk:"memory_requests"`
-	AgentId               types.String           `tfsdk:"agent_id"`
+	TunnelId              types.String           `tfsdk:"tunnel_id"`
 	SlackChannel          types.String           `tfsdk:"slack_channel"`
 	SlackNotifyOn         types.String           `tfsdk:"slack_notify_on"`
 	DriftDetectionEnabled types.Bool             `tfsdk:"drift_detection_enabled"`
@@ -161,8 +161,8 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 				Computed:            true,
 				Default:             stringdefault.StaticString("512M"),
 			},
-			"agent_id": schema.StringAttribute{
-				MarkdownDescription: "The agent id for the database.",
+			"tunnel_id": schema.StringAttribute{
+				MarkdownDescription: "The id of the Tunnel Devhub uses to run the workspace's jobs.",
 				Optional:            true,
 			},
 			"slack_channel": schema.StringAttribute{
@@ -413,7 +413,7 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 		Command:               plan.Command.ValueString(),
 		CpuRequests:           plan.CpuRequests.ValueString(),
 		MemoryRequests:        plan.MemoryRequests.ValueString(),
-		AgentId:               plan.AgentId.ValueString(),
+		TunnelId:              plan.TunnelId.ValueString(),
 		SlackChannel:          plan.SlackChannel.ValueString(),
 		SlackNotifyOn:         plan.SlackNotifyOn.ValueString(),
 		DriftDetectionEnabled: plan.DriftDetectionEnabled.ValueBool(),
@@ -515,10 +515,10 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 		}
 	}
 
-	if workspace.AgentId != "" {
-		state.AgentId = types.StringValue(workspace.AgentId)
+	if workspace.TunnelId != "" {
+		state.TunnelId = types.StringValue(workspace.TunnelId)
 	} else {
-		state.AgentId = types.StringNull()
+		state.TunnelId = types.StringNull()
 	}
 
 	if workspace.SlackChannel != "" {
@@ -644,7 +644,7 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 		Command:               plan.Command.ValueString(),
 		CpuRequests:           plan.CpuRequests.ValueString(),
 		MemoryRequests:        plan.MemoryRequests.ValueString(),
-		AgentId:               plan.AgentId.ValueString(),
+		TunnelId:              plan.TunnelId.ValueString(),
 		SlackChannel:          plan.SlackChannel.ValueString(),
 		SlackNotifyOn:         plan.SlackNotifyOn.ValueString(),
 		DriftDetectionEnabled: plan.DriftDetectionEnabled.ValueBool(),

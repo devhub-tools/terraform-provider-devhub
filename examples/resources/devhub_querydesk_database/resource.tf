@@ -7,6 +7,14 @@ resource "devhub_querydesk_database" "example" {
   ai_max_rows           = 500
   review_bypass_allowed = true
 
+  # Sent to the server when a connection opens. Here pgdog routes the database to the replica.
+  connection_parameters = [
+    {
+      name  = "pgdog.role"
+      value = "replica"
+    }
+  ]
+
   credentials = [
     {
       username           = "postgres"

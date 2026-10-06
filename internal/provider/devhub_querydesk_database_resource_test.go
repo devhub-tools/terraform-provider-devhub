@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -15,7 +16,10 @@ func TestAccDatabaseResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccDatabaseResourceConfig(name, true, 100, true, 30, true),
+				Config: testAccDatabaseResourceConfig(name, true, 100, true, 30, true, `connection_parameters = [
+    { name = "pgdog.role", value = "replica" },
+    { name = "options", value = "-c search_path=reporting" },
+  ]`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "adapter", "POSTGRES"),
@@ -39,6 +43,11 @@ func TestAccDatabaseResource(t *testing.T) {
 					resource.TestCheckNoResourceAttr("devhub_querydesk_database.test", "credentials.1.timeout"),
 					resource.TestCheckResourceAttrSet("devhub_querydesk_database.test", "credential_ids.postgres"),
 					resource.TestCheckResourceAttrSet("devhub_querydesk_database.test", "credential_ids.another"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.#", "2"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.0.name", "pgdog.role"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.0.value", "replica"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.1.name", "options"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.1.value", "-c search_path=reporting"),
 				),
 			},
 			// ImportState testing
@@ -50,7 +59,7 @@ func TestAccDatabaseResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false),
+				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, `connection_parameters = [{ name = "pgdog.role", value = "primary" }]`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name+"_updated"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "adapter", "POSTGRES"),
@@ -73,14 +82,36 @@ func TestAccDatabaseResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.1.ai_allowed", "false"),
 					resource.TestCheckResourceAttrSet("devhub_querydesk_database.test", "credential_ids.postgres"),
 					resource.TestCheckResourceAttrSet("devhub_querydesk_database.test", "credential_ids.another"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.#", "1"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.0.name", "pgdog.role"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.0.value", "primary"),
 				),
+			},
+			// Removing the attribute clears the database's connection parameters
+			{
+				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr("devhub_querydesk_database.test", "connection_parameters.#"),
+				),
+			},
+			// An empty list is accepted and plans clean
+			{
+				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, "connection_parameters = []"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "connection_parameters.#", "0"),
+				),
+			},
+			// A name the server reserves is refused with its reason
+			{
+				Config:      testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, `connection_parameters = [{ name = "user", value = "postgres" }]`),
+				ExpectError: regexp.MustCompile(`can't be a connection\s+parameter`),
 			},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
 }
 
-func testAccDatabaseResourceConfig(name string, aiEnabled bool, aiMaxRows int, aiAllowed bool, timeout int, reviewBypassAllowed bool) string {
+func testAccDatabaseResourceConfig(name string, aiEnabled bool, aiMaxRows int, aiAllowed bool, timeout int, reviewBypassAllowed bool, connectionParameters string) string {
 	return providerConfig + fmt.Sprintf(`
 resource "devhub_querydesk_database" "test" {
   name        = %[1]q
@@ -90,6 +121,7 @@ resource "devhub_querydesk_database" "test" {
   ai_enabled  = %[2]t
   ai_max_rows = %[3]d
   review_bypass_allowed = %[6]t
+  %[7]s
 
 	credentials = [
 		{
@@ -107,5 +139,5 @@ resource "devhub_querydesk_database" "test" {
 	}
 	]
 }
-`, name, aiEnabled, aiMaxRows, aiAllowed, timeout, reviewBypassAllowed)
+`, name, aiEnabled, aiMaxRows, aiAllowed, timeout, reviewBypassAllowed, connectionParameters)
 }
