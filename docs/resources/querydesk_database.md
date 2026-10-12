@@ -20,6 +20,7 @@ resource "devhub_querydesk_database" "example" {
   database              = "mydb"
   ai_enabled            = true
   ai_max_rows           = 500
+  ai_timeout            = 60
   review_bypass_allowed = true
 
   # Sent to the server when a connection opens. Here pgdog routes the database to the replica.
@@ -58,6 +59,7 @@ resource "devhub_querydesk_database" "example" {
 
 - `ai_enabled` (Boolean) Whether the AI agent may see and query this database. Opt-in, defaults to `false`.
 - `ai_max_rows` (Number) The maximum number of rows a single AI query may return against this database.
+- `ai_timeout` (Number) The number of seconds an AI query against this database may run, whichever credential it uses. A whole number of 1 or more. The AI agent cannot change it, and a credential's `timeout` has no bearing on it. Defaults to `10`.
 - `cacertfile` (String, Sensitive) The server ca cert to use with ssl connections, `ssl` must be set to `true`.
 - `certfile` (String, Sensitive) The client cert to use with ssl connections, `ssl` must be set to `true`.
 - `connection_parameters` (Attributes List) Names and values sent to the server when a connection opens, which Postgres calls startup parameters, in this order. They apply to every credential: Test Connection, queries and proxy sessions. Only a `POSTGRES` database sends them. A name can't be `user` or `database`. Leaving this unset, or setting it to an empty list, removes any the database has. (see [below for nested schema](#nestedatt--connection_parameters))
@@ -89,7 +91,7 @@ Optional:
 
 - `ai_allowed` (Boolean) Whether the AI agent is permitted to connect with this credential. Defaults to `false`.
 - `default_credential` (Boolean) Whether this is the default credential for the database.
-- `timeout` (Number) The number of seconds before an AI query using this credential is cancelled. Unset means no per-credential timeout.
+- `timeout` (Number) The longest, in seconds, a user's query using this credential may run. Unset means no cap for users. AI queries do not use it and run at the database's `ai_timeout`.
 
 Read-Only:
 

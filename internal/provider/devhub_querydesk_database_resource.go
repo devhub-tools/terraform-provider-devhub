@@ -52,6 +52,7 @@ type databaseResourceModel struct {
 	TunnelId             types.String               `tfsdk:"tunnel_id"`
 	AiEnabled            types.Bool                 `tfsdk:"ai_enabled"`
 	AiMaxRows            types.Int64                `tfsdk:"ai_max_rows"`
+	AiTimeout            types.Int64                `tfsdk:"ai_timeout"`
 	Credentials          []databaseCredentialModel  `tfsdk:"credentials"`
 	CredentialIds        types.Map                  `tfsdk:"credential_ids"`
 	ConnectionParameters []connectionParameterModel `tfsdk:"connection_parameters"`
@@ -176,6 +177,12 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:            true,
 				Default:             int64default.StaticInt64(500),
 			},
+			"ai_timeout": schema.Int64Attribute{
+				MarkdownDescription: "The number of seconds an AI query against this database may run, whichever credential it uses. A whole number of 1 or more. The AI agent cannot change it, and a credential's `timeout` has no bearing on it. Defaults to `10`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             int64default.StaticInt64(10),
+			},
 			"connection_parameters": schema.ListNestedAttribute{
 				MarkdownDescription: "Names and values sent to the server when a connection opens, which Postgres calls startup parameters, in this order. They apply to every credential: Test Connection, queries and proxy sessions. Only a `POSTGRES` database sends them. A name can't be `user` or `database`. Leaving this unset, or setting it to an empty list, removes any the database has.",
 				Optional:            true,
@@ -237,7 +244,7 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 							Default:             booldefault.StaticBool(false),
 						},
 						"timeout": schema.Int64Attribute{
-							MarkdownDescription: "The number of seconds before an AI query using this credential is cancelled. Unset means no per-credential timeout.",
+							MarkdownDescription: "The longest, in seconds, a user's query using this credential may run. Unset means no cap for users. AI queries do not use it and run at the database's `ai_timeout`.",
 							Optional:            true,
 						},
 					},
@@ -264,6 +271,7 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 	model.ReviewBypassAllowed = types.BoolValue(database.ReviewBypassAllowed)
 	model.AiEnabled = types.BoolValue(database.AiEnabled)
 	model.AiMaxRows = types.Int64Value(database.AiMaxRows)
+	model.AiTimeout = types.Int64Value(database.AiTimeout)
 
 	model.Port = types.Int64Null()
 	model.Group = types.StringNull()
@@ -386,6 +394,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		TunnelId:             plan.TunnelId.ValueString(),
 		AiEnabled:            plan.AiEnabled.ValueBool(),
 		AiMaxRows:            plan.AiMaxRows.ValueInt64(),
+		AiTimeout:            plan.AiTimeout.ValueInt64(),
 		Credentials:          credentials,
 		ConnectionParameters: connectionParametersFromModel(plan.ConnectionParameters),
 	}
@@ -496,6 +505,7 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		TunnelId:             plan.TunnelId.ValueString(),
 		AiEnabled:            plan.AiEnabled.ValueBool(),
 		AiMaxRows:            plan.AiMaxRows.ValueInt64(),
+		AiTimeout:            plan.AiTimeout.ValueInt64(),
 		Credentials:          credentials,
 		ConnectionParameters: connectionParametersFromModel(plan.ConnectionParameters),
 	}

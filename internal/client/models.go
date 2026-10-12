@@ -19,6 +19,7 @@ type Database struct {
 	TunnelId             string               `json:"tunnel_id"`
 	AiEnabled            bool                 `json:"ai_enabled"`
 	AiMaxRows            int64                `json:"ai_max_rows"`
+	AiTimeout            int64                `json:"ai_timeout"`
 	Credentials          []DatabaseCredential `json:"credentials"`
 	// Always sent as a list, never null: the API replaces the database's list with it.
 	ConnectionParameters []ConnectionParameter `json:"connection_parameters"`

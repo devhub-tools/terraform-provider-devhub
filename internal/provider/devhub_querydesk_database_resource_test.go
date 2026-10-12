@@ -16,7 +16,8 @@ func TestAccDatabaseResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccDatabaseResourceConfig(name, true, 100, true, 30, true, `connection_parameters = [
+				Config: testAccDatabaseResourceConfig(name, true, 100, true, 30, true, `ai_timeout = 120
+  connection_parameters = [
     { name = "pgdog.role", value = "replica" },
     { name = "options", value = "-c search_path=reporting" },
   ]`),
@@ -29,6 +30,7 @@ func TestAccDatabaseResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "review_bypass_allowed", "true"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_enabled", "true"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_max_rows", "100"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_timeout", "120"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.username", "postgres"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.password", "password"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.reviews_required", "0"),
@@ -59,7 +61,8 @@ func TestAccDatabaseResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, `connection_parameters = [{ name = "pgdog.role", value = "primary" }]`),
+				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, `ai_timeout = 45
+  connection_parameters = [{ name = "pgdog.role", value = "primary" }]`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name+"_updated"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "adapter", "POSTGRES"),
@@ -69,6 +72,7 @@ func TestAccDatabaseResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "review_bypass_allowed", "false"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_enabled", "false"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_max_rows", "250"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_timeout", "45"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.username", "postgres"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.password", "password"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.reviews_required", "0"),
@@ -89,9 +93,16 @@ func TestAccDatabaseResource(t *testing.T) {
 			},
 			// Removing the attribute clears the database's connection parameters
 			{
-				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, ""),
+				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, "ai_timeout = 45"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckNoResourceAttr("devhub_querydesk_database.test", "connection_parameters.#"),
+				),
+			},
+			// Leaving ai_timeout out sets the database back to 10
+			{
+				Config: testAccDatabaseResourceConfig(name+"_updated", false, 250, false, 60, false, ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_timeout", "10"),
 				),
 			},
 			// An empty list is accepted and plans clean
@@ -111,7 +122,7 @@ func TestAccDatabaseResource(t *testing.T) {
 	})
 }
 
-func testAccDatabaseResourceConfig(name string, aiEnabled bool, aiMaxRows int, aiAllowed bool, timeout int, reviewBypassAllowed bool, connectionParameters string) string {
+func testAccDatabaseResourceConfig(name string, aiEnabled bool, aiMaxRows int, aiAllowed bool, timeout int, reviewBypassAllowed bool, extraAttributes string) string {
 	return providerConfig + fmt.Sprintf(`
 resource "devhub_querydesk_database" "test" {
   name        = %[1]q
@@ -139,5 +150,27 @@ resource "devhub_querydesk_database" "test" {
 	}
 	]
 }
-`, name, aiEnabled, aiMaxRows, aiAllowed, timeout, reviewBypassAllowed, connectionParameters)
+`, name, aiEnabled, aiMaxRows, aiAllowed, timeout, reviewBypassAllowed, extraAttributes)
+}
+
+// A configuration that never mentions ai_timeout creates the database at 10, and the
+// plan after the apply is empty, which every step asserts unless told otherwise.
+func TestAccDatabaseResourceAiTimeoutDefault(t *testing.T) {
+	name := fmt.Sprintf("database_%s", acctest.RandString(10))
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDatabaseResourceConfig(name, true, 100, true, 30, false, ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_timeout", "10"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "credentials.0.timeout", "30"),
+				),
+			},
+			{
+				Config:   testAccDatabaseResourceConfig(name, true, 100, true, 30, false, ""),
+				PlanOnly: true,
+			},
+		},
+	})
 }

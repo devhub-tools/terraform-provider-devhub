@@ -5,6 +5,7 @@ resource "devhub_querydesk_database" "example" {
   database              = "mydb"
   ai_enabled            = true
   ai_max_rows           = 500
+  ai_timeout            = 60
   review_bypass_allowed = true
 
   # Sent to the server when a connection opens. Here pgdog routes the database to the replica.

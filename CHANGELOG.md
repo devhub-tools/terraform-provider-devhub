@@ -1,3 +1,9 @@
+## 2.45.0 (October 11, 2026)
+
+FEATURES:
+
+* resource/devhub_querydesk_database: add `ai_timeout`, the number of seconds an AI query against the database may run, whichever credential it uses. It defaults to `10`, and a credential's `timeout` now caps users' queries only
+
 ## 2.44.1 (October 5, 2026)
 
 NOTES:
