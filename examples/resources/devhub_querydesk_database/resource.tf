@@ -8,6 +8,9 @@ resource "devhub_querydesk_database" "example" {
   ai_timeout            = 60
   review_bypass_allowed = true
 
+  # Lets members ask to run one query unredacted, after a peer review. Leave it out to keep the database's current value.
+  unredacted_runs_allowed = true
+
   # Sent to the server when a connection opens. Here pgdog routes the database to the replica.
   connection_parameters = [
     {

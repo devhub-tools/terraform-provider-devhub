@@ -122,6 +122,91 @@ func TestAccDatabaseResource(t *testing.T) {
 	})
 }
 
+func TestAccDatabaseResourceUnredactedRunsAllowed(t *testing.T) {
+	name := fmt.Sprintf("database_%s", acctest.RandString(10))
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// A configuration that sets it on creates the database with it on
+			{
+				Config: testAccDatabaseUnredactedRunsConfig(name, "unredacted_runs_allowed = true"),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "true"),
+			},
+			// Import reads the database's current value
+			{
+				ResourceName:            "devhub_querydesk_database.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"credentials.0.password"},
+			},
+			// Changing it to off updates the database
+			{
+				Config: testAccDatabaseUnredactedRunsConfig(name, "unredacted_runs_allowed = false"),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "false"),
+			},
+			{
+				Config: testAccDatabaseUnredactedRunsConfig(name, "unredacted_runs_allowed = true"),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "true"),
+			},
+			// Removing it from a configuration that had it on leaves the database on, which is
+			// what a database that predates the setting sees. Each step fails on a plan that
+			// is not empty after its apply, so this also proves no change is planned.
+			{
+				Config: testAccDatabaseUnredactedRunsConfig(name, ""),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "true"),
+			},
+			// An unrelated change still sends nothing for it
+			{
+				Config: testAccDatabaseUnredactedRunsConfig(name+"_renamed", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name+"_renamed"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "true"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccDatabaseResourceUnredactedRunsAllowedOmitted(t *testing.T) {
+	name := fmt.Sprintf("database_%s", acctest.RandString(10))
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// A configuration that omits it creates the database with it off
+			{
+				Config: testAccDatabaseUnredactedRunsConfig(name, ""),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "false"),
+			},
+			// and plans no change afterwards
+			{
+				Config:   testAccDatabaseUnredactedRunsConfig(name, ""),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+func testAccDatabaseUnredactedRunsConfig(name string, unredactedRunsAllowed string) string {
+	return providerConfig + fmt.Sprintf(`
+resource "devhub_querydesk_database" "test" {
+  name     = %[1]q
+  adapter  = "POSTGRES"
+  hostname = "localhost"
+  database = "mydb"
+  %[2]s
+
+  credentials = [
+    {
+      username           = "postgres"
+      password           = "password"
+      reviews_required   = 0
+      default_credential = true
+    }
+  ]
+}
+`, name, unredactedRunsAllowed)
+}
+
 func testAccDatabaseResourceConfig(name string, aiEnabled bool, aiMaxRows int, aiAllowed bool, timeout int, reviewBypassAllowed bool, extraAttributes string) string {
 	return providerConfig + fmt.Sprintf(`
 resource "devhub_querydesk_database" "test" {

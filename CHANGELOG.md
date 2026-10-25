@@ -1,3 +1,9 @@
+## 2.46.0 (October 25, 2026)
+
+FEATURES:
+
+* resource/devhub_querydesk_database: add `unredacted_runs_allowed`, letting members ask to run one of their own queries once with nothing redacted after a peer review. Leaving it out of the configuration leaves the database's value unchanged, which is `true` for databases created before Devhub v2.46.0 and `false` for databases created since. Requires Devhub v2.46.0 or later: against an older Devhub the attribute reads as null, and an apply that sets it fails.
+
 ## 2.45.0 (October 11, 2026)
 
 FEATURES:

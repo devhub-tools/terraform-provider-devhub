@@ -23,6 +23,9 @@ resource "devhub_querydesk_database" "example" {
   ai_timeout            = 60
   review_bypass_allowed = true
 
+  # Lets members ask to run one query unredacted, after a peer review. Leave it out to keep the database's current value.
+  unredacted_runs_allowed = true
+
   # Sent to the server when a connection opens. Here pgdog routes the database to the replica.
   connection_parameters = [
     {
@@ -50,7 +53,7 @@ resource "devhub_querydesk_database" "example" {
 ### Required
 
 - `adapter` (String) The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL`, `CLICKHOUSE`, `SQLSERVER`, and `ORACLE` are supported.
-- `credentials` (Attributes List) (see [below for nested schema](#nestedatt--credentials))
+- `credentials` (Attributes List) The credentials Devhub connects to the database with. Removing an entry from this list removes that credential and withdraws its pending queries: Devhub deletes each query that has not run, with its approvals and comments, and replies in its Slack review thread. Queries that already ran are kept. (see [below for nested schema](#nestedatt--credentials))
 - `database` (String) The name of the database to connect to.
 - `hostname` (String) The hostname for connecting to the database, either an ip or url.
 - `name` (String) The name for users to use to identity the database.
@@ -71,6 +74,7 @@ resource "devhub_querydesk_database" "example" {
 - `slack_channel` (String) The slack channel to send query request notifications to.
 - `ssl` (Boolean) Set to `true` to turn on ssl connections for this database.
 - `tunnel_id` (String) The id of the Tunnel Devhub uses to reach the database.
+- `unredacted_runs_allowed` (Boolean) Set to `true` to let members ask to run one of their own queries once with nothing redacted. Each request needs at least one peer review and changes no data protection policy. Leaving it out keeps the database's current value, which is `true` for databases created before Devhub v2.46.0 and `false` for databases created since. Requires Devhub v2.46.0 or later.
 - `verify_server_hostname` (Boolean) Set to `true` to also verify that the server certificate matches the `hostname` being connected to (Postgres `sslmode=verify-full`). Requires `cacertfile`; without it the connection is encrypt-only and nothing is verified. Leave `false` for managed services that present a certificate not matching the endpoint hostname.
 
 ### Read-Only

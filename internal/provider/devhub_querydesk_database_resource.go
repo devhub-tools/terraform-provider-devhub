@@ -10,14 +10,17 @@ import (
 	devhub "terraform-provider-devhub/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -34,28 +37,29 @@ func DatabaseResource() resource.Resource {
 
 // DatabaseResourceModel describes the resource data model.
 type databaseResourceModel struct {
-	Id                   types.String               `tfsdk:"id"`
-	Name                 types.String               `tfsdk:"name"`
-	Adapter              types.String               `tfsdk:"adapter"`
-	Hostname             types.String               `tfsdk:"hostname"`
-	Port                 types.Int64                `tfsdk:"port"`
-	Database             types.String               `tfsdk:"database"`
-	Ssl                  types.Bool                 `tfsdk:"ssl"`
-	Cacertfile           types.String               `tfsdk:"cacertfile"`
-	Keyfile              types.String               `tfsdk:"keyfile"`
-	Certfile             types.String               `tfsdk:"certfile"`
-	VerifyServerHostname types.Bool                 `tfsdk:"verify_server_hostname"`
-	RestrictAccess       types.Bool                 `tfsdk:"restrict_access"`
-	ReviewBypassAllowed  types.Bool                 `tfsdk:"review_bypass_allowed"`
-	Group                types.String               `tfsdk:"group"`
-	SlackChannel         types.String               `tfsdk:"slack_channel"`
-	TunnelId             types.String               `tfsdk:"tunnel_id"`
-	AiEnabled            types.Bool                 `tfsdk:"ai_enabled"`
-	AiMaxRows            types.Int64                `tfsdk:"ai_max_rows"`
-	AiTimeout            types.Int64                `tfsdk:"ai_timeout"`
-	Credentials          []databaseCredentialModel  `tfsdk:"credentials"`
-	CredentialIds        types.Map                  `tfsdk:"credential_ids"`
-	ConnectionParameters []connectionParameterModel `tfsdk:"connection_parameters"`
+	Id                    types.String               `tfsdk:"id"`
+	Name                  types.String               `tfsdk:"name"`
+	Adapter               types.String               `tfsdk:"adapter"`
+	Hostname              types.String               `tfsdk:"hostname"`
+	Port                  types.Int64                `tfsdk:"port"`
+	Database              types.String               `tfsdk:"database"`
+	Ssl                   types.Bool                 `tfsdk:"ssl"`
+	Cacertfile            types.String               `tfsdk:"cacertfile"`
+	Keyfile               types.String               `tfsdk:"keyfile"`
+	Certfile              types.String               `tfsdk:"certfile"`
+	VerifyServerHostname  types.Bool                 `tfsdk:"verify_server_hostname"`
+	RestrictAccess        types.Bool                 `tfsdk:"restrict_access"`
+	ReviewBypassAllowed   types.Bool                 `tfsdk:"review_bypass_allowed"`
+	UnredactedRunsAllowed types.Bool                 `tfsdk:"unredacted_runs_allowed"`
+	Group                 types.String               `tfsdk:"group"`
+	SlackChannel          types.String               `tfsdk:"slack_channel"`
+	TunnelId              types.String               `tfsdk:"tunnel_id"`
+	AiEnabled             types.Bool                 `tfsdk:"ai_enabled"`
+	AiMaxRows             types.Int64                `tfsdk:"ai_max_rows"`
+	AiTimeout             types.Int64                `tfsdk:"ai_timeout"`
+	Credentials           []databaseCredentialModel  `tfsdk:"credentials"`
+	CredentialIds         types.Map                  `tfsdk:"credential_ids"`
+	ConnectionParameters  []connectionParameterModel `tfsdk:"connection_parameters"`
 }
 
 type connectionParameterModel struct {
@@ -153,6 +157,16 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 			},
+			// No default, because a static one would be sent on every apply and turn the setting
+			// off on a database that had it on before this attribute existed.
+			"unredacted_runs_allowed": schema.BoolAttribute{
+				MarkdownDescription: "Set to `true` to let members ask to run one of their own queries once with nothing redacted. Each request needs at least one peer review and changes no data protection policy. Leaving it out keeps the database's current value, which is `true` for databases created before Devhub v2.46.0 and `false` for databases created since. Requires Devhub v2.46.0 or later.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"group": schema.StringAttribute{
 				MarkdownDescription: "The group this database belongs to, used for UI grouping.",
 				Optional:            true,
@@ -208,7 +222,8 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 			"credentials": schema.ListNestedAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: "The credentials Devhub connects to the database with. Removing an entry from this list removes that credential and withdraws its pending queries: Devhub deletes each query that has not run, with its approvals and comments, and replies in its Slack review thread. Queries that already ran are kept.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -272,6 +287,12 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 	model.AiEnabled = types.BoolValue(database.AiEnabled)
 	model.AiMaxRows = types.Int64Value(database.AiMaxRows)
 	model.AiTimeout = types.Int64Value(database.AiTimeout)
+
+	// an app that predates the setting returns nothing for it
+	model.UnredactedRunsAllowed = types.BoolNull()
+	if database.UnredactedRunsAllowed != nil {
+		model.UnredactedRunsAllowed = types.BoolValue(*database.UnredactedRunsAllowed)
+	}
 
 	model.Port = types.Int64Null()
 	model.Group = types.StringNull()
@@ -343,11 +364,31 @@ func connectionParametersFromModel(model []connectionParameterModel) []devhub.Co
 	return parameters
 }
 
+// unredactedRunsAllowedFromConfig is the value the configuration sets, or nil when it
+// sets none. The plan can't answer that. With the attribute omitted it holds the
+// state's value, and sending that back would be the provider deciding the setting.
+func unredactedRunsAllowedFromConfig(ctx context.Context, config tfsdk.Config, diags *diag.Diagnostics) *bool {
+	var configured types.Bool
+	diags.Append(config.GetAttribute(ctx, path.Root("unredacted_runs_allowed"), &configured)...)
+
+	if configured.IsNull() || configured.IsUnknown() {
+		return nil
+	}
+
+	value := configured.ValueBool()
+	return &value
+}
+
 func (r *databaseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
 	var plan databaseResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	unredactedRunsAllowed := unredactedRunsAllowedFromConfig(ctx, req.Config, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -377,26 +418,27 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	input := devhub.Database{
-		Name:                 plan.Name.ValueString(),
-		Adapter:              strings.ToLower(plan.Adapter.ValueString()),
-		Hostname:             plan.Hostname.ValueString(),
-		Port:                 port,
-		Database:             plan.Database.ValueString(),
-		Ssl:                  plan.Ssl.ValueBool(),
-		Cacertfile:           plan.Cacertfile.ValueString(),
-		Keyfile:              plan.Keyfile.ValueString(),
-		Certfile:             plan.Certfile.ValueString(),
-		VerifyServerHostname: plan.VerifyServerHostname.ValueBool(),
-		RestrictAccess:       plan.RestrictAccess.ValueBool(),
-		ReviewBypassAllowed:  plan.ReviewBypassAllowed.ValueBool(),
-		Group:                plan.Group.ValueString(),
-		SlackChannel:         plan.SlackChannel.ValueString(),
-		TunnelId:             plan.TunnelId.ValueString(),
-		AiEnabled:            plan.AiEnabled.ValueBool(),
-		AiMaxRows:            plan.AiMaxRows.ValueInt64(),
-		AiTimeout:            plan.AiTimeout.ValueInt64(),
-		Credentials:          credentials,
-		ConnectionParameters: connectionParametersFromModel(plan.ConnectionParameters),
+		Name:                  plan.Name.ValueString(),
+		Adapter:               strings.ToLower(plan.Adapter.ValueString()),
+		Hostname:              plan.Hostname.ValueString(),
+		Port:                  port,
+		Database:              plan.Database.ValueString(),
+		Ssl:                   plan.Ssl.ValueBool(),
+		Cacertfile:            plan.Cacertfile.ValueString(),
+		Keyfile:               plan.Keyfile.ValueString(),
+		Certfile:              plan.Certfile.ValueString(),
+		VerifyServerHostname:  plan.VerifyServerHostname.ValueBool(),
+		RestrictAccess:        plan.RestrictAccess.ValueBool(),
+		ReviewBypassAllowed:   plan.ReviewBypassAllowed.ValueBool(),
+		UnredactedRunsAllowed: unredactedRunsAllowed,
+		Group:                 plan.Group.ValueString(),
+		SlackChannel:          plan.SlackChannel.ValueString(),
+		TunnelId:              plan.TunnelId.ValueString(),
+		AiEnabled:             plan.AiEnabled.ValueBool(),
+		AiMaxRows:             plan.AiMaxRows.ValueInt64(),
+		AiTimeout:             plan.AiTimeout.ValueInt64(),
+		Credentials:           credentials,
+		ConnectionParameters:  connectionParametersFromModel(plan.ConnectionParameters),
 	}
 
 	database, err := r.client.CreateDatabase(input)
@@ -462,6 +504,11 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
+	unredactedRunsAllowed := unredactedRunsAllowedFromConfig(ctx, req.Config, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	var credentials []devhub.DatabaseCredential
 	for _, credential := range plan.Credentials {
 		var timeout *int64
@@ -488,26 +535,27 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	input := devhub.Database{
-		Name:                 plan.Name.ValueString(),
-		Adapter:              strings.ToLower(plan.Adapter.ValueString()),
-		Hostname:             plan.Hostname.ValueString(),
-		Port:                 port,
-		Database:             plan.Database.ValueString(),
-		Ssl:                  plan.Ssl.ValueBool(),
-		Cacertfile:           plan.Cacertfile.ValueString(),
-		Keyfile:              plan.Keyfile.ValueString(),
-		Certfile:             plan.Certfile.ValueString(),
-		VerifyServerHostname: plan.VerifyServerHostname.ValueBool(),
-		RestrictAccess:       plan.RestrictAccess.ValueBool(),
-		ReviewBypassAllowed:  plan.ReviewBypassAllowed.ValueBool(),
-		Group:                plan.Group.ValueString(),
-		SlackChannel:         plan.SlackChannel.ValueString(),
-		TunnelId:             plan.TunnelId.ValueString(),
-		AiEnabled:            plan.AiEnabled.ValueBool(),
-		AiMaxRows:            plan.AiMaxRows.ValueInt64(),
-		AiTimeout:            plan.AiTimeout.ValueInt64(),
-		Credentials:          credentials,
-		ConnectionParameters: connectionParametersFromModel(plan.ConnectionParameters),
+		Name:                  plan.Name.ValueString(),
+		Adapter:               strings.ToLower(plan.Adapter.ValueString()),
+		Hostname:              plan.Hostname.ValueString(),
+		Port:                  port,
+		Database:              plan.Database.ValueString(),
+		Ssl:                   plan.Ssl.ValueBool(),
+		Cacertfile:            plan.Cacertfile.ValueString(),
+		Keyfile:               plan.Keyfile.ValueString(),
+		Certfile:              plan.Certfile.ValueString(),
+		VerifyServerHostname:  plan.VerifyServerHostname.ValueBool(),
+		RestrictAccess:        plan.RestrictAccess.ValueBool(),
+		ReviewBypassAllowed:   plan.ReviewBypassAllowed.ValueBool(),
+		UnredactedRunsAllowed: unredactedRunsAllowed,
+		Group:                 plan.Group.ValueString(),
+		SlackChannel:          plan.SlackChannel.ValueString(),
+		TunnelId:              plan.TunnelId.ValueString(),
+		AiEnabled:             plan.AiEnabled.ValueBool(),
+		AiMaxRows:             plan.AiMaxRows.ValueInt64(),
+		AiTimeout:             plan.AiTimeout.ValueInt64(),
+		Credentials:           credentials,
+		ConnectionParameters:  connectionParametersFromModel(plan.ConnectionParameters),
 	}
 
 	// Update existing order

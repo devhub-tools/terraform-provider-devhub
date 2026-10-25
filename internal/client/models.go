@@ -1,26 +1,29 @@
 package devhub
 
 type Database struct {
-	Id                   string               `json:"id"`
-	Name                 string               `json:"name"`
-	Adapter              string               `json:"adapter"`
-	Hostname             string               `json:"hostname"`
-	Port                 *int64               `json:"port"`
-	Database             string               `json:"database"`
-	Ssl                  bool                 `json:"ssl"`
-	Cacertfile           string               `json:"cacertfile"`
-	Keyfile              string               `json:"keyfile"`
-	Certfile             string               `json:"certfile"`
-	VerifyServerHostname bool                 `json:"verify_server_hostname"`
-	RestrictAccess       bool                 `json:"restrict_access"`
-	ReviewBypassAllowed  bool                 `json:"review_bypass_allowed"`
-	Group                string               `json:"group"`
-	SlackChannel         string               `json:"slack_channel"`
-	TunnelId             string               `json:"tunnel_id"`
-	AiEnabled            bool                 `json:"ai_enabled"`
-	AiMaxRows            int64                `json:"ai_max_rows"`
-	AiTimeout            int64                `json:"ai_timeout"`
-	Credentials          []DatabaseCredential `json:"credentials"`
+	Id                   string `json:"id"`
+	Name                 string `json:"name"`
+	Adapter              string `json:"adapter"`
+	Hostname             string `json:"hostname"`
+	Port                 *int64 `json:"port"`
+	Database             string `json:"database"`
+	Ssl                  bool   `json:"ssl"`
+	Cacertfile           string `json:"cacertfile"`
+	Keyfile              string `json:"keyfile"`
+	Certfile             string `json:"certfile"`
+	VerifyServerHostname bool   `json:"verify_server_hostname"`
+	RestrictAccess       bool   `json:"restrict_access"`
+	ReviewBypassAllowed  bool   `json:"review_bypass_allowed"`
+	// A pointer so an unset value is left out of the request, which keeps the database's
+	// own value, and so an app that predates the setting reads as absent.
+	UnredactedRunsAllowed *bool                `json:"unredacted_runs_allowed,omitempty"`
+	Group                 string               `json:"group"`
+	SlackChannel          string               `json:"slack_channel"`
+	TunnelId              string               `json:"tunnel_id"`
+	AiEnabled             bool                 `json:"ai_enabled"`
+	AiMaxRows             int64                `json:"ai_max_rows"`
+	AiTimeout             int64                `json:"ai_timeout"`
+	Credentials           []DatabaseCredential `json:"credentials"`
 	// Always sent as a list, never null: the API replaces the database's list with it.
 	ConnectionParameters []ConnectionParameter `json:"connection_parameters"`
 }

@@ -183,7 +183,7 @@ func (r *workflowResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
-							MarkdownDescription: "The name of the step.",
+							MarkdownDescription: "The name of the step. Together with the action type it identifies the step across updates. While both stay the same, the step and the runs waiting at it are kept. Renaming it, changing its action type or leaving it unnamed replaces it, and replacing or removing an approval step cancels the runs that wait at it or have yet to reach it.",
 							Optional:            true,
 						},
 						"condition": schema.StringAttribute{

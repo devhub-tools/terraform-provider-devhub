@@ -116,7 +116,7 @@ Optional:
 - `approval_action` (Attributes) (see [below for nested schema](#nestedatt--steps--approval_action))
 - `condition` (String) Expression to evaluate if this step should run, if evaluated as true step will run, otherwise it will be skipped. If no condition is set the step will always run. You can use the input, output from previous steps, and basic operators like ==, !=, >, <, >=, <=, &&, ||, not.
 - `condition_action` (Attributes) (see [below for nested schema](#nestedatt--steps--condition_action))
-- `name` (String) The name of the step.
+- `name` (String) The name of the step. Together with the action type it identifies the step across updates. While both stay the same, the step and the runs waiting at it are kept. Renaming it, changing its action type or leaving it unnamed replaces it, and replacing or removing an approval step cancels the runs that wait at it or have yet to reach it.
 - `query_action` (Attributes) (see [below for nested schema](#nestedatt--steps--query_action))
 - `slack_action` (Attributes) (see [below for nested schema](#nestedatt--steps--slack_action))
 - `slack_reply_action` (Attributes) (see [below for nested schema](#nestedatt--steps--slack_reply_action))
