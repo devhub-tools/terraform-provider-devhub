@@ -39,7 +39,7 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.name", "query-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.query_action.query", "SELECT * FROM users WHERE id = '${user_id}'"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.query_action.timeout", "10"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.query_action.credential_id", "crd_123"),
+					resource.TestCheckResourceAttrPair("devhub_workflow.test", "steps.3.query_action.credential_id", "devhub_querydesk_database.test", "credentials.0.id"),
 
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.name", "slack-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_action.slack_channel", "#general"),
@@ -85,7 +85,7 @@ func TestAccWorkflowResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.name", "query-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.query_action.query", "SELECT * FROM users WHERE id = '${user_id}'"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.query_action.timeout", "10"),
-					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.3.query_action.credential_id", "crd_123"),
+					resource.TestCheckResourceAttrPair("devhub_workflow.test", "steps.3.query_action.credential_id", "devhub_querydesk_database.test", "credentials.0.id"),
 
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.name", "slack-step"),
 					resource.TestCheckResourceAttr("devhub_workflow.test", "steps.4.slack_action.slack_channel", "#general"),
@@ -135,6 +135,23 @@ data "devhub_role" "engineers" {
 
 data "devhub_user" "michael" {
   email = "michael@devhub.tools"
+}
+
+# the query step's credential has to exist in the organization
+resource "devhub_querydesk_database" "test" {
+  name     = "%[1]s_db"
+  adapter  = "POSTGRES"
+  hostname = "localhost"
+  database = "mydb"
+
+  credentials = [
+    {
+      username           = "postgres"
+      password           = "password"
+      reviews_required   = 0
+      default_credential = true
+    }
+  ]
 }
 
 resource "devhub_workflow" "test" {
@@ -189,7 +206,7 @@ resource "devhub_workflow" "test" {
 			name = "query-step"
 			query_action = {
 				query = "SELECT * FROM users WHERE id = '$${user_id}'"
-				credential_id = "crd_123"
+				credential_id = devhub_querydesk_database.test.credentials[0].id
 				timeout = 10
 			}
 		},

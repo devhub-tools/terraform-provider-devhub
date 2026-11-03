@@ -1,3 +1,15 @@
+## 3.0.0 (November 2, 2026)
+
+FEATURES:
+
+* resource/devhub_querydesk_database: `adapter` accepts `MONGODB`, `COCKROACHDB`, `TIDB`, `OCEANBASE`, `TIMESCALEDB`, `MARIADB`, `REDSHIFT`, `STARROCKS`, `DORIS` and `ALLOYDB`. Requires Devhub v3.0.0 or later.
+* resource/devhub_querydesk_database: add `srv`, `auth_source`, `replica_set` and `schema_sampling`, the `MONGODB` connection options. Requires Devhub v3.0.0 or later.
+* resource/devhub_querydesk_database: add `ai_read_only`, limiting the AI agent to statements that read data. Leaving it out keeps the database's current value. Requires Devhub v3.0.0 or later: against an older Devhub it reads as null, and an apply that sets it fails.
+
+BUG FIXES:
+
+* resource/devhub_querydesk_database: adding, removing or renaming a credential no longer fails the apply with "Provider produced inconsistent result after apply" on `credential_ids`.
+
 ## 2.46.0 (October 25, 2026)
 
 FEATURES:

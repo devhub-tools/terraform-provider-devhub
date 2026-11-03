@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -55,8 +54,13 @@ type databaseResourceModel struct {
 	SlackChannel          types.String               `tfsdk:"slack_channel"`
 	TunnelId              types.String               `tfsdk:"tunnel_id"`
 	AiEnabled             types.Bool                 `tfsdk:"ai_enabled"`
+	AiReadOnly            types.Bool                 `tfsdk:"ai_read_only"`
 	AiMaxRows             types.Int64                `tfsdk:"ai_max_rows"`
 	AiTimeout             types.Int64                `tfsdk:"ai_timeout"`
+	Srv                   types.Bool                 `tfsdk:"srv"`
+	AuthSource            types.String               `tfsdk:"auth_source"`
+	ReplicaSet            types.String               `tfsdk:"replica_set"`
+	SchemaSampling        types.Bool                 `tfsdk:"schema_sampling"`
 	Credentials           []databaseCredentialModel  `tfsdk:"credentials"`
 	CredentialIds         types.Map                  `tfsdk:"credential_ids"`
 	ConnectionParameters  []connectionParameterModel `tfsdk:"connection_parameters"`
@@ -103,7 +107,7 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required:            true,
 			},
 			"adapter": schema.StringAttribute{
-				MarkdownDescription: "The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL`, `CLICKHOUSE`, `SQLSERVER`, and `ORACLE` are supported.",
+				MarkdownDescription: "The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL`, `CLICKHOUSE`, `SQLSERVER`, `ORACLE`, `MONGODB`, `COCKROACHDB`, `TIDB`, `OCEANBASE`, `TIMESCALEDB`, `MARIADB`, `REDSHIFT`, `STARROCKS`, `DORIS`, and `ALLOYDB` are supported.",
 				Required:            true,
 			},
 			"port": schema.Int64Attribute{
@@ -185,6 +189,16 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 			},
+			// No default, as for unredacted_runs_allowed: a static one would flip a database
+			// that existed before this attribute did.
+			"ai_read_only": schema.BoolAttribute{
+				MarkdownDescription: "Set to `true` to let the AI agent run only statements that read data on this database. QueryDesk refuses any write before it reaches the database or asks for a review, and on PostgreSQL, MySQL, Oracle, ClickHouse, CockroachDB, TiDB, OceanBase, TimescaleDB, MariaDB, Amazon Redshift and Google AlloyDB the database refuses writes too. SQL Server, MongoDB, StarRocks and Apache Doris have no read-only transaction, so there QueryDesk's check is the only one; on MongoDB, give the AI's credentials only the `read` role. A person's own queries are not affected. Leaving it out keeps the database's current value, which is `false` for databases created before Devhub v3.0.0 and `true` for databases created since. Requires Devhub v3.0.0 or later.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"ai_max_rows": schema.Int64Attribute{
 				MarkdownDescription: "The maximum number of rows a single AI query may return against this database.",
 				Optional:            true,
@@ -196,6 +210,30 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional:            true,
 				Computed:            true,
 				Default:             int64default.StaticInt64(10),
+			},
+			"srv": schema.BoolAttribute{
+				MarkdownDescription: "`MONGODB` only. Set to `true` to look `hostname` up as a `mongodb+srv://` name, whose SRV record lists the servers and whose TXT record may set `auth_source` and `replica_set`. It always connects with TLS. Ignored behind a `tunnel_id`, where `hostname` is dialed as it is. Defaults to `false`. Requires Devhub v3.0.0 or later.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"auth_source": schema.StringAttribute{
+				MarkdownDescription: "`MONGODB` only. The database the credentials authenticate against, `admin` for most deployments. Leave unset to authenticate against `database`. Requires Devhub v3.0.0 or later.",
+				Optional:            true,
+			},
+			"replica_set": schema.StringAttribute{
+				MarkdownDescription: "`MONGODB` only. The replica set's name. A query asks `hostname` for the set's primary and runs there. Ignored behind a `tunnel_id`. Requires Devhub v3.0.0 or later.",
+				Optional:            true,
+			},
+			// No default, as for unredacted_runs_allowed: a static one would read as drift
+			// against an app that predates the setting.
+			"schema_sampling": schema.BoolAttribute{
+				MarkdownDescription: "`MONGODB` only. Whether each schema sync reads field names and types from up to 1,000 sampled documents per collection. Set to `false` to read them from each collection's `$jsonSchema` validator instead, so no document is read. Data protection policies are built on the fields this finds. Leaving it out keeps the database's current value, which is `true` for a new database. Requires Devhub v3.0.0 or later.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"connection_parameters": schema.ListNestedAttribute{
 				MarkdownDescription: "Names and values sent to the server when a connection opens, which Postgres calls startup parameters, in this order. They apply to every credential: Test Connection, queries and proxy sessions. Only a `POSTGRES` database sends them. A name can't be `user` or `database`. Leaving this unset, or setting it to an empty list, removes any the database has.",
@@ -218,7 +256,7 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:            true,
 				MarkdownDescription: "A map of credential IDs by username.",
 				PlanModifiers: []planmodifier.Map{
-					mapplanmodifier.UseStateForUnknown(),
+					credentialIdsPlanModifier{},
 				},
 			},
 			"credentials": schema.ListNestedAttribute{
@@ -294,10 +332,32 @@ func hydrateModelFromDatabase(model *databaseResourceModel, database *devhub.Dat
 		model.UnredactedRunsAllowed = types.BoolValue(*database.UnredactedRunsAllowed)
 	}
 
+	model.AiReadOnly = types.BoolNull()
+	if database.AiReadOnly != nil {
+		model.AiReadOnly = types.BoolValue(*database.AiReadOnly)
+	}
+
+	model.Srv = types.BoolValue(database.Srv)
+
+	model.SchemaSampling = types.BoolNull()
+	if database.SchemaSampling != nil {
+		model.SchemaSampling = types.BoolValue(*database.SchemaSampling)
+	}
+
 	model.Port = types.Int64Null()
 	model.Group = types.StringNull()
 	model.SlackChannel = types.StringNull()
 	model.TunnelId = types.StringNull()
+	model.AuthSource = types.StringNull()
+	model.ReplicaSet = types.StringNull()
+
+	if database.AuthSource != "" {
+		model.AuthSource = types.StringValue(database.AuthSource)
+	}
+
+	if database.ReplicaSet != "" {
+		model.ReplicaSet = types.StringValue(database.ReplicaSet)
+	}
 
 	if database.Port != nil {
 		model.Port = types.Int64Value(*database.Port)
@@ -364,12 +424,12 @@ func connectionParametersFromModel(model []connectionParameterModel) []devhub.Co
 	return parameters
 }
 
-// unredactedRunsAllowedFromConfig is the value the configuration sets, or nil when it
+// boolFromConfig is the value the configuration sets for attribute, or nil when it
 // sets none. The plan can't answer that. With the attribute omitted it holds the
 // state's value, and sending that back would be the provider deciding the setting.
-func unredactedRunsAllowedFromConfig(ctx context.Context, config tfsdk.Config, diags *diag.Diagnostics) *bool {
+func boolFromConfig(ctx context.Context, config tfsdk.Config, attribute string, diags *diag.Diagnostics) *bool {
 	var configured types.Bool
-	diags.Append(config.GetAttribute(ctx, path.Root("unredacted_runs_allowed"), &configured)...)
+	diags.Append(config.GetAttribute(ctx, path.Root(attribute), &configured)...)
 
 	if configured.IsNull() || configured.IsUnknown() {
 		return nil
@@ -388,7 +448,9 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	unredactedRunsAllowed := unredactedRunsAllowedFromConfig(ctx, req.Config, &resp.Diagnostics)
+	unredactedRunsAllowed := boolFromConfig(ctx, req.Config, "unredacted_runs_allowed", &resp.Diagnostics)
+	aiReadOnly := boolFromConfig(ctx, req.Config, "ai_read_only", &resp.Diagnostics)
+	schemaSampling := boolFromConfig(ctx, req.Config, "schema_sampling", &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -435,8 +497,13 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		SlackChannel:          plan.SlackChannel.ValueString(),
 		TunnelId:              plan.TunnelId.ValueString(),
 		AiEnabled:             plan.AiEnabled.ValueBool(),
+		AiReadOnly:            aiReadOnly,
 		AiMaxRows:             plan.AiMaxRows.ValueInt64(),
 		AiTimeout:             plan.AiTimeout.ValueInt64(),
+		Srv:                   plan.Srv.ValueBool(),
+		AuthSource:            plan.AuthSource.ValueString(),
+		ReplicaSet:            plan.ReplicaSet.ValueString(),
+		SchemaSampling:        schemaSampling,
 		Credentials:           credentials,
 		ConnectionParameters:  connectionParametersFromModel(plan.ConnectionParameters),
 	}
@@ -504,7 +571,9 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	unredactedRunsAllowed := unredactedRunsAllowedFromConfig(ctx, req.Config, &resp.Diagnostics)
+	unredactedRunsAllowed := boolFromConfig(ctx, req.Config, "unredacted_runs_allowed", &resp.Diagnostics)
+	aiReadOnly := boolFromConfig(ctx, req.Config, "ai_read_only", &resp.Diagnostics)
+	schemaSampling := boolFromConfig(ctx, req.Config, "schema_sampling", &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -552,8 +621,13 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		SlackChannel:          plan.SlackChannel.ValueString(),
 		TunnelId:              plan.TunnelId.ValueString(),
 		AiEnabled:             plan.AiEnabled.ValueBool(),
+		AiReadOnly:            aiReadOnly,
 		AiMaxRows:             plan.AiMaxRows.ValueInt64(),
 		AiTimeout:             plan.AiTimeout.ValueInt64(),
+		Srv:                   plan.Srv.ValueBool(),
+		AuthSource:            plan.AuthSource.ValueString(),
+		ReplicaSet:            plan.ReplicaSet.ValueString(),
+		SchemaSampling:        schemaSampling,
 		Credentials:           credentials,
 		ConnectionParameters:  connectionParametersFromModel(plan.ConnectionParameters),
 	}
@@ -618,4 +692,46 @@ func (r *databaseResource) Configure(_ context.Context, req resource.ConfigureRe
 
 func (r *databaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// credentialIdsPlanModifier keeps credential_ids from state only while the credential
+// usernames are unchanged. Adding, removing or renaming a credential changes the map's keys,
+// so it is left unknown and set from the apply.
+type credentialIdsPlanModifier struct{}
+
+func (m credentialIdsPlanModifier) Description(_ context.Context) string {
+	return "Uses the prior state while the credential usernames are unchanged."
+}
+
+func (m credentialIdsPlanModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m credentialIdsPlanModifier) PlanModifyMap(ctx context.Context, req planmodifier.MapRequest, resp *planmodifier.MapResponse) {
+	if req.StateValue.IsNull() || !req.PlanValue.IsUnknown() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	var credentials []databaseCredentialModel
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("credentials"), &credentials)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	stateIds := req.StateValue.Elements()
+	if len(credentials) != len(stateIds) {
+		return
+	}
+
+	for _, credential := range credentials {
+		if credential.Username.IsUnknown() {
+			return
+		}
+
+		if _, ok := stateIds[credential.Username.ValueString()]; !ok {
+			return
+		}
+	}
+
+	resp.PlanValue = req.StateValue
 }

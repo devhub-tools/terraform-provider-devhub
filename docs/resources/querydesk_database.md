@@ -19,6 +19,7 @@ resource "devhub_querydesk_database" "example" {
   hostname              = "localhost"
   database              = "mydb"
   ai_enabled            = true
+  ai_read_only          = true
   ai_max_rows           = 500
   ai_timeout            = 60
   review_bypass_allowed = true
@@ -52,7 +53,7 @@ resource "devhub_querydesk_database" "example" {
 
 ### Required
 
-- `adapter` (String) The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL`, `CLICKHOUSE`, `SQLSERVER`, and `ORACLE` are supported.
+- `adapter` (String) The adapter to use to establish the connection. Currently only `POSTGRES`, `MYSQL`, `CLICKHOUSE`, `SQLSERVER`, `ORACLE`, `MONGODB`, `COCKROACHDB`, `TIDB`, `OCEANBASE`, `TIMESCALEDB`, `MARIADB`, `REDSHIFT`, `STARROCKS`, `DORIS`, and `ALLOYDB` are supported.
 - `credentials` (Attributes List) The credentials Devhub connects to the database with. Removing an entry from this list removes that credential and withdraws its pending queries: Devhub deletes each query that has not run, with its approvals and comments, and replies in its Slack review thread. Queries that already ran are kept. (see [below for nested schema](#nestedatt--credentials))
 - `database` (String) The name of the database to connect to.
 - `hostname` (String) The hostname for connecting to the database, either an ip or url.
@@ -62,16 +63,21 @@ resource "devhub_querydesk_database" "example" {
 
 - `ai_enabled` (Boolean) Whether the AI agent may see and query this database. Opt-in, defaults to `false`.
 - `ai_max_rows` (Number) The maximum number of rows a single AI query may return against this database.
+- `ai_read_only` (Boolean) Set to `true` to let the AI agent run only statements that read data on this database. QueryDesk refuses any write before it reaches the database or asks for a review, and on PostgreSQL, MySQL, Oracle, ClickHouse, CockroachDB, TiDB, OceanBase, TimescaleDB, MariaDB, Amazon Redshift and Google AlloyDB the database refuses writes too. SQL Server, MongoDB, StarRocks and Apache Doris have no read-only transaction, so there QueryDesk's check is the only one; on MongoDB, give the AI's credentials only the `read` role. A person's own queries are not affected. Leaving it out keeps the database's current value, which is `false` for databases created before Devhub v3.0.0 and `true` for databases created since. Requires Devhub v3.0.0 or later.
 - `ai_timeout` (Number) The number of seconds an AI query against this database may run, whichever credential it uses. A whole number of 1 or more. The AI agent cannot change it, and a credential's `timeout` has no bearing on it. Defaults to `10`.
+- `auth_source` (String) `MONGODB` only. The database the credentials authenticate against, `admin` for most deployments. Leave unset to authenticate against `database`. Requires Devhub v3.0.0 or later.
 - `cacertfile` (String, Sensitive) The server ca cert to use with ssl connections, `ssl` must be set to `true`.
 - `certfile` (String, Sensitive) The client cert to use with ssl connections, `ssl` must be set to `true`.
 - `connection_parameters` (Attributes List) Names and values sent to the server when a connection opens, which Postgres calls startup parameters, in this order. They apply to every credential: Test Connection, queries and proxy sessions. Only a `POSTGRES` database sends them. A name can't be `user` or `database`. Leaving this unset, or setting it to an empty list, removes any the database has. (see [below for nested schema](#nestedatt--connection_parameters))
 - `group` (String) The group this database belongs to, used for UI grouping.
 - `keyfile` (String, Sensitive) The client key to use with ssl connections, `ssl` must be set to `true`.
 - `port` (Number) The port to connect to the database on, if not specified the default port for the database type will be used.
+- `replica_set` (String) `MONGODB` only. The replica set's name. A query asks `hostname` for the set's primary and runs there. Ignored behind a `tunnel_id`. Requires Devhub v3.0.0 or later.
 - `restrict_access` (Boolean) Whether access to this databases should be explicitly granted to users or if any authenticated user can access it.
 - `review_bypass_allowed` (Boolean) Set to `true` to let a super admin run their own query that hasn't met the `reviews_required` on its credential, by explicitly acknowledging the override. Only a super admin can, holding approve on the database is not enough, and every bypass is recorded against the query, shown in the audit log, and posted to `slack_channel`. Defaults to `false`.
+- `schema_sampling` (Boolean) `MONGODB` only. Whether each schema sync reads field names and types from up to 1,000 sampled documents per collection. Set to `false` to read them from each collection's `$jsonSchema` validator instead, so no document is read. Data protection policies are built on the fields this finds. Leaving it out keeps the database's current value, which is `true` for a new database. Requires Devhub v3.0.0 or later.
 - `slack_channel` (String) The slack channel to send query request notifications to.
+- `srv` (Boolean) `MONGODB` only. Set to `true` to look `hostname` up as a `mongodb+srv://` name, whose SRV record lists the servers and whose TXT record may set `auth_source` and `replica_set`. It always connects with TLS. Ignored behind a `tunnel_id`, where `hostname` is dialed as it is. Defaults to `false`. Requires Devhub v3.0.0 or later.
 - `ssl` (Boolean) Set to `true` to turn on ssl connections for this database.
 - `tunnel_id` (String) The id of the Tunnel Devhub uses to reach the database.
 - `unredacted_runs_allowed` (Boolean) Set to `true` to let members ask to run one of their own queries once with nothing redacted. Each request needs at least one peer review and changes no data protection policy. Leaving it out keeps the database's current value, which is `true` for databases created before Devhub v2.46.0 and `false` for databases created since. Requires Devhub v2.46.0 or later.

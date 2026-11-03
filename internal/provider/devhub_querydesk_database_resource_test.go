@@ -129,7 +129,7 @@ func TestAccDatabaseResourceUnredactedRunsAllowed(t *testing.T) {
 		Steps: []resource.TestStep{
 			// A configuration that sets it on creates the database with it on
 			{
-				Config: testAccDatabaseUnredactedRunsConfig(name, "unredacted_runs_allowed = true"),
+				Config: testAccDatabaseOptionalAttributeConfig(name, "unredacted_runs_allowed = true"),
 				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "true"),
 			},
 			// Import reads the database's current value
@@ -141,23 +141,23 @@ func TestAccDatabaseResourceUnredactedRunsAllowed(t *testing.T) {
 			},
 			// Changing it to off updates the database
 			{
-				Config: testAccDatabaseUnredactedRunsConfig(name, "unredacted_runs_allowed = false"),
+				Config: testAccDatabaseOptionalAttributeConfig(name, "unredacted_runs_allowed = false"),
 				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "false"),
 			},
 			{
-				Config: testAccDatabaseUnredactedRunsConfig(name, "unredacted_runs_allowed = true"),
+				Config: testAccDatabaseOptionalAttributeConfig(name, "unredacted_runs_allowed = true"),
 				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "true"),
 			},
 			// Removing it from a configuration that had it on leaves the database on, which is
 			// what a database that predates the setting sees. Each step fails on a plan that
 			// is not empty after its apply, so this also proves no change is planned.
 			{
-				Config: testAccDatabaseUnredactedRunsConfig(name, ""),
+				Config: testAccDatabaseOptionalAttributeConfig(name, ""),
 				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "true"),
 			},
 			// An unrelated change still sends nothing for it
 			{
-				Config: testAccDatabaseUnredactedRunsConfig(name+"_renamed", ""),
+				Config: testAccDatabaseOptionalAttributeConfig(name+"_renamed", ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name+"_renamed"),
 					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "true"),
@@ -174,19 +174,81 @@ func TestAccDatabaseResourceUnredactedRunsAllowedOmitted(t *testing.T) {
 		Steps: []resource.TestStep{
 			// A configuration that omits it creates the database with it off
 			{
-				Config: testAccDatabaseUnredactedRunsConfig(name, ""),
+				Config: testAccDatabaseOptionalAttributeConfig(name, ""),
 				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "unredacted_runs_allowed", "false"),
 			},
 			// and plans no change afterwards
 			{
-				Config:   testAccDatabaseUnredactedRunsConfig(name, ""),
+				Config:   testAccDatabaseOptionalAttributeConfig(name, ""),
 				PlanOnly: true,
 			},
 		},
 	})
 }
 
-func testAccDatabaseUnredactedRunsConfig(name string, unredactedRunsAllowed string) string {
+func TestAccDatabaseResourceAiReadOnly(t *testing.T) {
+	name := fmt.Sprintf("database_%s", acctest.RandString(10))
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// A configuration that turns it off creates the database with AI writes allowed
+			{
+				Config: testAccDatabaseOptionalAttributeConfig(name, "ai_read_only = false"),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_read_only", "false"),
+			},
+			// Import reads the database's current value
+			{
+				ResourceName:            "devhub_querydesk_database.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"credentials.0.password"},
+			},
+			{
+				Config: testAccDatabaseOptionalAttributeConfig(name, "ai_read_only = true"),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_read_only", "true"),
+			},
+			{
+				Config: testAccDatabaseOptionalAttributeConfig(name, "ai_read_only = false"),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_read_only", "false"),
+			},
+			// Removing it from the configuration leaves the database as it was, as an upgrade of
+			// the provider does for a database that predates the setting, and plans no change
+			{
+				Config: testAccDatabaseOptionalAttributeConfig(name, ""),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_read_only", "false"),
+			},
+			// An unrelated change still sends nothing for it
+			{
+				Config: testAccDatabaseOptionalAttributeConfig(name+"_renamed", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "name", name+"_renamed"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_read_only", "false"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccDatabaseResourceAiReadOnlyOmitted(t *testing.T) {
+	name := fmt.Sprintf("database_%s", acctest.RandString(10))
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// A configuration that omits it creates the database read-only for AI
+			{
+				Config: testAccDatabaseOptionalAttributeConfig(name, ""),
+				Check:  resource.TestCheckResourceAttr("devhub_querydesk_database.test", "ai_read_only", "true"),
+			},
+			// and plans no change afterwards
+			{
+				Config:   testAccDatabaseOptionalAttributeConfig(name, ""),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+func testAccDatabaseOptionalAttributeConfig(name string, attribute string) string {
 	return providerConfig + fmt.Sprintf(`
 resource "devhub_querydesk_database" "test" {
   name     = %[1]q
@@ -204,7 +266,7 @@ resource "devhub_querydesk_database" "test" {
     }
   ]
 }
-`, name, unredactedRunsAllowed)
+`, name, attribute)
 }
 
 func testAccDatabaseResourceConfig(name string, aiEnabled bool, aiMaxRows int, aiAllowed bool, timeout int, reviewBypassAllowed bool, extraAttributes string) string {
@@ -258,4 +320,69 @@ func TestAccDatabaseResourceAiTimeoutDefault(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestAccDatabaseResourceMongodb(t *testing.T) {
+	name := fmt.Sprintf("database_%s", acctest.RandString(10))
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Its own connection options are stored, and sampling is on when left out
+			{
+				Config: testAccMongodbDatabaseConfig(name, `srv         = true
+  auth_source = "admin"
+  replica_set = "rs0"`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "adapter", "MONGODB"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "srv", "true"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "auth_source", "admin"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "replica_set", "rs0"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "schema_sampling", "true"),
+				),
+			},
+			// Import reads them back
+			{
+				ResourceName:            "devhub_querydesk_database.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"credentials.0.password"},
+			},
+			// Removing them clears them, and sampling can be turned off
+			{
+				Config: testAccMongodbDatabaseConfig(name, "schema_sampling = false"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "srv", "false"),
+					resource.TestCheckNoResourceAttr("devhub_querydesk_database.test", "auth_source"),
+					resource.TestCheckNoResourceAttr("devhub_querydesk_database.test", "replica_set"),
+					resource.TestCheckResourceAttr("devhub_querydesk_database.test", "schema_sampling", "false"),
+				),
+			},
+			// Leaving sampling out keeps the database's value and plans no change
+			{
+				Config:   testAccMongodbDatabaseConfig(name, ""),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
+func testAccMongodbDatabaseConfig(name string, attributes string) string {
+	return providerConfig + fmt.Sprintf(`
+resource "devhub_querydesk_database" "test" {
+  name     = %[1]q
+  adapter  = "MONGODB"
+  hostname = "cluster0.example.mongodb.net"
+  database = "app"
+  %[2]s
+
+  credentials = [
+    {
+      username           = "app"
+      password           = "password"
+      reviews_required   = 0
+      default_credential = true
+    }
+  ]
+}
+`, name, attributes)
 }

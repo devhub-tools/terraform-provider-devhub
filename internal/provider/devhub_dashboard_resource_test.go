@@ -22,9 +22,9 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.inputs.0.key", "user_id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.inputs.0.description", "User ID"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.query", "SELECT * FROM users WHERE id = '$${user_id}'"),
-					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.credential_id", "123"),
+					resource.TestCheckResourceAttrPair("devhub_dashboard.test", "panels.0.query_details.credential_id", "devhub_querydesk_database.test", "credentials.0.id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.label", "Disable user"),
-					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.workflow_id", "wf_123"),
+					resource.TestCheckResourceAttrPair("devhub_dashboard.test", "panels.0.actions.0.workflow_id", "devhub_workflow.test", "id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.input_mappings.0.workflow_input_key", "user_id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.input_mappings.0.column", "id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.input_mappings.1.workflow_input_key", "reason"),
@@ -47,9 +47,9 @@ func TestAccDashboardResource(t *testing.T) {
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.inputs.0.key", "user_id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.inputs.0.description", "User ID"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.query", "SELECT * FROM users WHERE id = '$${user_id}'"),
-					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.query_details.credential_id", "123"),
+					resource.TestCheckResourceAttrPair("devhub_dashboard.test", "panels.0.query_details.credential_id", "devhub_querydesk_database.test", "credentials.0.id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.label", "Disable user"),
-					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.workflow_id", "wf_123"),
+					resource.TestCheckResourceAttrPair("devhub_dashboard.test", "panels.0.actions.0.workflow_id", "devhub_workflow.test", "id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.input_mappings.0.workflow_input_key", "user_id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.input_mappings.0.column", "id"),
 					resource.TestCheckResourceAttr("devhub_dashboard.test", "panels.0.actions.0.input_mappings.1.workflow_input_key", "reason"),
@@ -64,6 +64,42 @@ func TestAccDashboardResource(t *testing.T) {
 
 func testAccDashboardResourceConfig(name string) string {
 	return providerConfig + fmt.Sprintf(`
+# panels' credentials and actions' workflows have to exist in the organization
+resource "devhub_querydesk_database" "test" {
+  name     = "%[1]s_db"
+  adapter  = "POSTGRES"
+  hostname = "localhost"
+  database = "mydb"
+
+  credentials = [
+    {
+      username           = "postgres"
+      password           = "password"
+      reviews_required   = 0
+      default_credential = true
+    }
+  ]
+}
+
+resource "devhub_workflow" "test" {
+  name = "%[1]s_workflow"
+
+  inputs = [
+    { key = "user_id", type = "string" },
+    { key = "reason", type = "string" }
+  ]
+
+  steps = [
+    {
+      name = "condition-step"
+      condition_action = {
+        condition  = "true"
+        when_false = "succeeded"
+      }
+    }
+  ]
+}
+
 resource "devhub_dashboard" "test" {
   name     = %[1]q
   panels = [
@@ -80,7 +116,7 @@ resource "devhub_dashboard" "test" {
 			actions = [
 				{
 					label = "Disable user"
-					workflow_id = "wf_123"
+					workflow_id = devhub_workflow.test.id
 
 					input_mappings = [
 						{
@@ -98,7 +134,7 @@ resource "devhub_dashboard" "test" {
 
 			query_details = {
 				query = "SELECT * FROM users WHERE id = '$$${user_id}'"
-				credential_id = "123"
+				credential_id = devhub_querydesk_database.test.credentials[0].id
 			}
 		},
     {
@@ -106,7 +142,7 @@ resource "devhub_dashboard" "test" {
 
 			query_details = {
 				query = "SELECT * FROM users WHERE id = '$${user_id}'"
-				credential_id = "123"
+				credential_id = devhub_querydesk_database.test.credentials[0].id
 			}
 		}
 	]

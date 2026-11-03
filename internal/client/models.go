@@ -16,14 +16,22 @@ type Database struct {
 	ReviewBypassAllowed  bool   `json:"review_bypass_allowed"`
 	// A pointer so an unset value is left out of the request, which keeps the database's
 	// own value, and so an app that predates the setting reads as absent.
-	UnredactedRunsAllowed *bool                `json:"unredacted_runs_allowed,omitempty"`
-	Group                 string               `json:"group"`
-	SlackChannel          string               `json:"slack_channel"`
-	TunnelId              string               `json:"tunnel_id"`
-	AiEnabled             bool                 `json:"ai_enabled"`
-	AiMaxRows             int64                `json:"ai_max_rows"`
-	AiTimeout             int64                `json:"ai_timeout"`
-	Credentials           []DatabaseCredential `json:"credentials"`
+	UnredactedRunsAllowed *bool  `json:"unredacted_runs_allowed,omitempty"`
+	Group                 string `json:"group"`
+	SlackChannel          string `json:"slack_channel"`
+	TunnelId              string `json:"tunnel_id"`
+	AiEnabled             bool   `json:"ai_enabled"`
+	// A pointer for the same reason as UnredactedRunsAllowed
+	AiReadOnly  *bool                `json:"ai_read_only,omitempty"`
+	AiMaxRows   int64                `json:"ai_max_rows"`
+	AiTimeout   int64                `json:"ai_timeout"`
+	Credentials []DatabaseCredential `json:"credentials"`
+	// MongoDB's own connection options; every other engine leaves them empty.
+	Srv        bool   `json:"srv"`
+	AuthSource string `json:"auth_source"`
+	ReplicaSet string `json:"replica_set"`
+	// A pointer for the same reason as UnredactedRunsAllowed
+	SchemaSampling *bool `json:"schema_sampling,omitempty"`
 	// Always sent as a list, never null: the API replaces the database's list with it.
 	ConnectionParameters []ConnectionParameter `json:"connection_parameters"`
 }

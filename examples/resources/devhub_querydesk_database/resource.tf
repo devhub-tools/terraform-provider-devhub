@@ -4,6 +4,7 @@ resource "devhub_querydesk_database" "example" {
   hostname              = "localhost"
   database              = "mydb"
   ai_enabled            = true
+  ai_read_only          = true
   ai_max_rows           = 500
   ai_timeout            = 60
   review_bypass_allowed = true
