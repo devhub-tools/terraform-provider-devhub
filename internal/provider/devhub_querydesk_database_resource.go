@@ -9,6 +9,8 @@ import (
 	"strings"
 	devhub "terraform-provider-devhub/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -19,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -45,6 +48,8 @@ type databaseResourceModel struct {
 	Ssl                   types.Bool                 `tfsdk:"ssl"`
 	Cacertfile            types.String               `tfsdk:"cacertfile"`
 	Keyfile               types.String               `tfsdk:"keyfile"`
+	KeyfileWo             types.String               `tfsdk:"keyfile_wo"`
+	KeyfileWoVersion      types.Int64                `tfsdk:"keyfile_wo_version"`
 	Certfile              types.String               `tfsdk:"certfile"`
 	VerifyServerHostname  types.Bool                 `tfsdk:"verify_server_hostname"`
 	RestrictAccess        types.Bool                 `tfsdk:"restrict_access"`
@@ -75,6 +80,8 @@ type databaseCredentialModel struct {
 	Id                types.String `tfsdk:"id"`
 	Username          types.String `tfsdk:"username"`
 	Password          types.String `tfsdk:"password"`
+	PasswordWo        types.String `tfsdk:"password_wo"`
+	PasswordWoVersion types.Int64  `tfsdk:"password_wo_version"`
 	ReviewsRequired   types.Int64  `tfsdk:"reviews_required"`
 	DefaultCredential types.Bool   `tfsdk:"default_credential"`
 	AiAllowed         types.Bool   `tfsdk:"ai_allowed"`
@@ -134,9 +141,25 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Sensitive:           true,
 			},
 			"keyfile": schema.StringAttribute{
-				MarkdownDescription: "The client key to use with ssl connections, `ssl` must be set to `true`.",
+				MarkdownDescription: "The client key to use with ssl connections, `ssl` must be set to `true`. Conflicts with `keyfile_wo`.",
 				Optional:            true,
 				Sensitive:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("keyfile_wo")),
+				},
+			},
+			"keyfile_wo": schema.StringAttribute{
+				MarkdownDescription: "Write-only `keyfile`, never stored in plan or state, so it can come from an ephemeral resource. Bump `keyfile_wo_version` to send a new value. Requires Terraform 1.11 or later.",
+				Optional:            true,
+				Sensitive:           true,
+				WriteOnly:           true,
+			},
+			"keyfile_wo_version": schema.Int64Attribute{
+				MarkdownDescription: "Change this to send the current `keyfile_wo` to Devhub. Terraform can't see a change to a write-only value, so without it a rotated key only goes out with the next change to this database.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AlsoRequires(path.MatchRoot("keyfile_wo")),
+				},
 			},
 			"certfile": schema.StringAttribute{
 				MarkdownDescription: "The client cert to use with ssl connections, `ssl` must be set to `true`.",
@@ -276,9 +299,25 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 							Required:            true,
 						},
 						"password": schema.StringAttribute{
-							MarkdownDescription: "The username to use for connecting to the database.",
-							Required:            true,
+							MarkdownDescription: "The password to use for connecting to the database. Exactly one of `password` or `password_wo` is required.",
+							Optional:            true,
 							Sensitive:           true,
+							Validators: []validator.String{
+								stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("password_wo")),
+							},
+						},
+						"password_wo": schema.StringAttribute{
+							MarkdownDescription: "Write-only `password`, never stored in plan or state, so it can come from an ephemeral resource such as `google_secret_manager_secret_version`. Bump `password_wo_version` to send a new value. Requires Terraform 1.11 or later.",
+							Optional:            true,
+							Sensitive:           true,
+							WriteOnly:           true,
+						},
+						"password_wo_version": schema.Int64Attribute{
+							MarkdownDescription: "Change this to send the current `password_wo` to Devhub. Terraform can't see a change to a write-only value, so without it a rotated password only goes out with the next change to this database.",
+							Optional:            true,
+							Validators: []validator.Int64{
+								int64validator.AlsoRequires(path.MatchRelative().AtParent().AtName("password_wo")),
+							},
 						},
 						"reviews_required": schema.Int64Attribute{
 							MarkdownDescription: "The number of reviews required before a query can be executed.",
@@ -424,6 +463,15 @@ func connectionParametersFromModel(model []connectionParameterModel) []devhub.Co
 	return parameters
 }
 
+// writeOnlyOr is the write-only value when the config sets one, else the plain one.
+func writeOnlyOr(plain types.String, writeOnly types.String) string {
+	if !writeOnly.IsNull() && !writeOnly.IsUnknown() {
+		return writeOnly.ValueString()
+	}
+
+	return plain.ValueString()
+}
+
 // boolFromConfig is the value the configuration sets for attribute, or nil when it
 // sets none. The plan can't answer that. With the attribute omitted it holds the
 // state's value, and sending that back would be the provider deciding the setting.
@@ -451,12 +499,16 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 	unredactedRunsAllowed := boolFromConfig(ctx, req.Config, "unredacted_runs_allowed", &resp.Diagnostics)
 	aiReadOnly := boolFromConfig(ctx, req.Config, "ai_read_only", &resp.Diagnostics)
 	schemaSampling := boolFromConfig(ctx, req.Config, "schema_sampling", &resp.Diagnostics)
+
+	// write-only values are null in the plan, only the config has them
+	var config databaseResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	var credentials []devhub.DatabaseCredential
-	for _, credential := range plan.Credentials {
+	for index, credential := range plan.Credentials {
 		var timeout *int64
 		if !credential.Timeout.IsNull() {
 			timeoutValue := credential.Timeout.ValueInt64()
@@ -465,7 +517,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 
 		credentials = append(credentials, devhub.DatabaseCredential{
 			Username:          credential.Username.ValueString(),
-			Password:          credential.Password.ValueString(),
+			Password:          writeOnlyOr(credential.Password, config.Credentials[index].PasswordWo),
 			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
 			DefaultCredential: credential.DefaultCredential.ValueBool(),
 			AiAllowed:         credential.AiAllowed.ValueBool(),
@@ -487,7 +539,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		Database:              plan.Database.ValueString(),
 		Ssl:                   plan.Ssl.ValueBool(),
 		Cacertfile:            plan.Cacertfile.ValueString(),
-		Keyfile:               plan.Keyfile.ValueString(),
+		Keyfile:               writeOnlyOr(plan.Keyfile, config.KeyfileWo),
 		Certfile:              plan.Certfile.ValueString(),
 		VerifyServerHostname:  plan.VerifyServerHostname.ValueBool(),
 		RestrictAccess:        plan.RestrictAccess.ValueBool(),
@@ -574,12 +626,16 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 	unredactedRunsAllowed := boolFromConfig(ctx, req.Config, "unredacted_runs_allowed", &resp.Diagnostics)
 	aiReadOnly := boolFromConfig(ctx, req.Config, "ai_read_only", &resp.Diagnostics)
 	schemaSampling := boolFromConfig(ctx, req.Config, "schema_sampling", &resp.Diagnostics)
+
+	// write-only values are null in the plan, only the config has them
+	var config databaseResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	var credentials []devhub.DatabaseCredential
-	for _, credential := range plan.Credentials {
+	for index, credential := range plan.Credentials {
 		var timeout *int64
 		if !credential.Timeout.IsNull() {
 			timeoutValue := credential.Timeout.ValueInt64()
@@ -589,7 +645,7 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		credentials = append(credentials, devhub.DatabaseCredential{
 			Id:                credential.Id.ValueString(),
 			Username:          credential.Username.ValueString(),
-			Password:          credential.Password.ValueString(),
+			Password:          writeOnlyOr(credential.Password, config.Credentials[index].PasswordWo),
 			ReviewsRequired:   int(credential.ReviewsRequired.ValueInt64()),
 			DefaultCredential: credential.DefaultCredential.ValueBool(),
 			AiAllowed:         credential.AiAllowed.ValueBool(),
@@ -611,7 +667,7 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 		Database:              plan.Database.ValueString(),
 		Ssl:                   plan.Ssl.ValueBool(),
 		Cacertfile:            plan.Cacertfile.ValueString(),
-		Keyfile:               plan.Keyfile.ValueString(),
+		Keyfile:               writeOnlyOr(plan.Keyfile, config.KeyfileWo),
 		Certfile:              plan.Certfile.ValueString(),
 		VerifyServerHostname:  plan.VerifyServerHostname.ValueBool(),
 		RestrictAccess:        plan.RestrictAccess.ValueBool(),

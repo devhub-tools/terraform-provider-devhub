@@ -28,6 +28,18 @@ resource "devhub_querydesk_database" "example" {
       default_credential = true
       ai_allowed         = true
       timeout            = 30
+    },
+    {
+      # write-only, read from Google Secret Manager and never stored in state.
+      # Bump password_wo_version to send a rotated password. Terraform 1.11+.
+      username            = "readonly"
+      password_wo         = ephemeral.google_secret_manager_secret_version.readonly_password.secret_data
+      password_wo_version = 1
+      reviews_required    = 0
     }
   ]
+}
+
+ephemeral "google_secret_manager_secret_version" "readonly_password" {
+  secret = "querydesk-readonly-password"
 }

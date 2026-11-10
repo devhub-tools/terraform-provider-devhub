@@ -42,6 +42,13 @@ resource "devhub_terradesk_workspace" "example" {
       name  = "OP_SERVICE_ACCOUNT_TOKEN"
       value = var.op_service_account_token
       raw   = true
+    },
+    {
+      # write-only, read from Google Secret Manager and never stored in state.
+      # Bump value_wo_version to send a rotated value. Terraform 1.11+.
+      name             = "db_password"
+      value_wo         = ephemeral.google_secret_manager_secret_version.db_password.secret_data
+      value_wo_version = 1
     }
   ]
 
@@ -50,6 +57,10 @@ resource "devhub_terradesk_workspace" "example" {
     service_account_email = "devhub@my-project.iam.gserviceaccount.com"
     provider              = google_iam_workload_identity_pool_provider.devhub.name
   }
+}
+
+ephemeral "google_secret_manager_secret_version" "db_password" {
+  secret = "terradesk-db-password"
 }
 
 resource "google_iam_workload_identity_pool" "devhub" {

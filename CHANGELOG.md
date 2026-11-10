@@ -1,3 +1,14 @@
+## 3.1.2 (November 9, 2026)
+
+FEATURES:
+
+* resource/devhub_querydesk_database: add write-only `credentials.password_wo` and `keyfile_wo`, with `password_wo_version` and `keyfile_wo_version` to send a new value, so they can come from an ephemeral resource such as `google_secret_manager_secret_version` and never land in plan or state. `credentials.password` is now optional: set exactly one of `password` or `password_wo`. Requires Terraform 1.11 or later.
+* resource/devhub_terradesk_workspace: add write-only `secrets.value_wo`, with `value_wo_version` to send a new value. `secrets.value` is now optional: set exactly one of `value` or `value_wo`. Requires Terraform 1.11 or later.
+
+NOTES:
+
+* resource/devhub_terradesk_workspace: `secrets` no longer defaults to `[]`, since a computed list can't hold a write-only attribute. A workspace whose configuration leaves `secrets` out plans one in-place update from `[]` to null after upgrading, which changes nothing in Devhub.
+
 ## 3.0.0 (November 2, 2026)
 
 FEATURES:

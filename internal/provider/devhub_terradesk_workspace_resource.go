@@ -9,6 +9,7 @@ import (
 	"regexp"
 	devhub "terraform-provider-devhub/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -84,10 +85,12 @@ type envVarModel struct {
 }
 
 type secretModel struct {
-	Id    types.String `tfsdk:"id"`
-	Name  types.String `tfsdk:"name"`
-	Value types.String `tfsdk:"value"`
-	Raw   types.Bool   `tfsdk:"raw"`
+	Id             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	Value          types.String `tfsdk:"value"`
+	ValueWo        types.String `tfsdk:"value_wo"`
+	ValueWoVersion types.Int64  `tfsdk:"value_wo_version"`
+	Raw            types.Bool   `tfsdk:"raw"`
 }
 
 type terradeskWorkspaceResource struct {
@@ -313,22 +316,10 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 					},
 				},
 			},
+			// Not Computed with an empty default like env_vars: a computed nested attribute
+			// can't hold the write-only value_wo.
 			"secrets": schema.ListNestedAttribute{
 				Optional: true,
-				Computed: true,
-				Default: listdefault.StaticValue(
-					types.ListValueMust(
-						types.ObjectType{
-							AttrTypes: map[string]attr.Type{
-								"id":    types.StringType,
-								"name":  types.StringType,
-								"value": types.StringType,
-								"raw":   types.BoolType,
-							},
-						},
-						[]attr.Value{},
-					),
-				),
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -343,9 +334,25 @@ func (r *terradeskWorkspaceResource) Schema(_ context.Context, _ resource.Schema
 							Required:            true,
 						},
 						"value": schema.StringAttribute{
-							MarkdownDescription: "Secret value.",
-							Required:            true,
+							MarkdownDescription: "Secret value. Exactly one of `value` or `value_wo` is required.",
+							Optional:            true,
 							Sensitive:           true,
+							Validators: []validator.String{
+								stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_wo")),
+							},
+						},
+						"value_wo": schema.StringAttribute{
+							MarkdownDescription: "Write-only `value`, never stored in plan or state, so it can come from an ephemeral resource such as `google_secret_manager_secret_version`. Bump `value_wo_version` to send a new value. Requires Terraform 1.11 or later.",
+							Optional:            true,
+							Sensitive:           true,
+							WriteOnly:           true,
+						},
+						"value_wo_version": schema.Int64Attribute{
+							MarkdownDescription: "Change this to send the current `value_wo` to Devhub. Terraform can't see a change to a write-only value, so without it a rotated secret only goes out with the next change to this workspace.",
+							Optional:            true,
+							Validators: []validator.Int64{
+								int64validator.AlsoRequires(path.MatchRelative().AtParent().AtName("value_wo")),
+							},
 						},
 						"raw": schema.BoolAttribute{
 							MarkdownDescription: "Expose the secret under its literal name instead of `TF_VAR_<name>`, for tooling that reads its own environment (for example `OP_SERVICE_ACCOUNT_TOKEN`).",
@@ -365,6 +372,10 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 	var plan terradeskWorkspaceResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
+
+	// write-only values are null in the plan, only the config has them
+	var config terradeskWorkspaceResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -378,10 +389,10 @@ func (r *terradeskWorkspaceResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	var secrets []devhub.Secret
-	for _, secret := range plan.Secrets {
+	for index, secret := range plan.Secrets {
 		secrets = append(secrets, devhub.Secret{
 			Name:  secret.Name.ValueString(),
-			Value: secret.Value.ValueString(),
+			Value: writeOnlyOr(secret.Value, config.Secrets[index].ValueWo),
 			Raw:   secret.Raw.ValueBool(),
 		})
 	}
@@ -553,7 +564,8 @@ func (r *terradeskWorkspaceResource) Read(ctx context.Context, req resource.Read
 		state.EnvVars[index].Value = types.StringValue(envVar.Value)
 	}
 
-	if state.Secrets == nil || len(state.Secrets) != len(workspace.Secrets) {
+	// left null when the config sets none, as there's no default to read back as []
+	if (state.Secrets == nil && len(workspace.Secrets) > 0) || (state.Secrets != nil && len(state.Secrets) != len(workspace.Secrets)) {
 		state.Secrets = make([]secretModel, len(workspace.Secrets))
 	}
 
@@ -594,6 +606,10 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 	var plan terradeskWorkspaceResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
+
+	// write-only values are null in the plan, only the config has them
+	var config terradeskWorkspaceResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -608,11 +624,11 @@ func (r *terradeskWorkspaceResource) Update(ctx context.Context, req resource.Up
 	}
 
 	var secrets []devhub.Secret
-	for _, secret := range plan.Secrets {
+	for index, secret := range plan.Secrets {
 		secrets = append(secrets, devhub.Secret{
 			Id:    secret.Id.ValueString(),
 			Name:  secret.Name.ValueString(),
-			Value: secret.Value.ValueString(),
+			Value: writeOnlyOr(secret.Value, config.Secrets[index].ValueWo),
 			Raw:   secret.Raw.ValueBool(),
 		})
 	}

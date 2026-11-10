@@ -43,8 +43,20 @@ resource "devhub_querydesk_database" "example" {
       default_credential = true
       ai_allowed         = true
       timeout            = 30
+    },
+    {
+      # write-only, read from Google Secret Manager and never stored in state.
+      # Bump password_wo_version to send a rotated password. Terraform 1.11+.
+      username            = "readonly"
+      password_wo         = ephemeral.google_secret_manager_secret_version.readonly_password.secret_data
+      password_wo_version = 1
+      reviews_required    = 0
     }
   ]
+}
+
+ephemeral "google_secret_manager_secret_version" "readonly_password" {
+  secret = "querydesk-readonly-password"
 }
 ```
 
@@ -61,6 +73,8 @@ resource "devhub_querydesk_database" "example" {
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `ai_enabled` (Boolean) Whether the AI agent may see and query this database. Opt-in, defaults to `false`.
 - `ai_max_rows` (Number) The maximum number of rows a single AI query may return against this database.
 - `ai_read_only` (Boolean) Set to `true` to let the AI agent run only statements that read data on this database. QueryDesk refuses any write before it reaches the database or asks for a review, and on PostgreSQL, MySQL, Oracle, ClickHouse, CockroachDB, TiDB, OceanBase, TimescaleDB, MariaDB, Amazon Redshift and Google AlloyDB the database refuses writes too. SQL Server, MongoDB, StarRocks and Apache Doris have no read-only transaction, so there QueryDesk's check is the only one; on MongoDB, give the AI's credentials only the `read` role. A person's own queries are not affected. Leaving it out keeps the database's current value, which is `false` for databases created before Devhub v3.0.0 and `true` for databases created since. Requires Devhub v3.0.0 or later.
@@ -70,7 +84,9 @@ resource "devhub_querydesk_database" "example" {
 - `certfile` (String, Sensitive) The client cert to use with ssl connections, `ssl` must be set to `true`.
 - `connection_parameters` (Attributes List) Names and values sent to the server when a connection opens, which Postgres calls startup parameters, in this order. They apply to every credential: Test Connection, queries and proxy sessions. Only a `POSTGRES` database sends them. A name can't be `user` or `database`. Leaving this unset, or setting it to an empty list, removes any the database has. (see [below for nested schema](#nestedatt--connection_parameters))
 - `group` (String) The group this database belongs to, used for UI grouping.
-- `keyfile` (String, Sensitive) The client key to use with ssl connections, `ssl` must be set to `true`.
+- `keyfile` (String, Sensitive) The client key to use with ssl connections, `ssl` must be set to `true`. Conflicts with `keyfile_wo`.
+- `keyfile_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Write-only `keyfile`, never stored in plan or state, so it can come from an ephemeral resource. Bump `keyfile_wo_version` to send a new value. Requires Terraform 1.11 or later.
+- `keyfile_wo_version` (Number) Change this to send the current `keyfile_wo` to Devhub. Terraform can't see a change to a write-only value, so without it a rotated key only goes out with the next change to this database.
 - `port` (Number) The port to connect to the database on, if not specified the default port for the database type will be used.
 - `replica_set` (String) `MONGODB` only. The replica set's name. A query asks `hostname` for the set's primary and runs there. Ignored behind a `tunnel_id`. Requires Devhub v3.0.0 or later.
 - `restrict_access` (Boolean) Whether access to this databases should be explicitly granted to users or if any authenticated user can access it.
@@ -93,7 +109,6 @@ resource "devhub_querydesk_database" "example" {
 
 Required:
 
-- `password` (String, Sensitive) The username to use for connecting to the database.
 - `reviews_required` (Number) The number of reviews required before a query can be executed.
 - `username` (String) The username to use for connecting to the database.
 
@@ -101,6 +116,9 @@ Optional:
 
 - `ai_allowed` (Boolean) Whether the AI agent is permitted to connect with this credential. Defaults to `false`.
 - `default_credential` (Boolean) Whether this is the default credential for the database.
+- `password` (String, Sensitive) The password to use for connecting to the database. Exactly one of `password` or `password_wo` is required.
+- `password_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Write-only `password`, never stored in plan or state, so it can come from an ephemeral resource such as `google_secret_manager_secret_version`. Bump `password_wo_version` to send a new value. Requires Terraform 1.11 or later.
+- `password_wo_version` (Number) Change this to send the current `password_wo` to Devhub. Terraform can't see a change to a write-only value, so without it a rotated password only goes out with the next change to this database.
 - `timeout` (Number) The longest, in seconds, a user's query using this credential may run. Unset means no cap for users. AI queries do not use it and run at the database's `ai_timeout`.
 
 Read-Only:

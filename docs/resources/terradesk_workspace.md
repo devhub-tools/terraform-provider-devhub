@@ -57,6 +57,13 @@ resource "devhub_terradesk_workspace" "example" {
       name  = "OP_SERVICE_ACCOUNT_TOKEN"
       value = var.op_service_account_token
       raw   = true
+    },
+    {
+      # write-only, read from Google Secret Manager and never stored in state.
+      # Bump value_wo_version to send a rotated value. Terraform 1.11+.
+      name             = "db_password"
+      value_wo         = ephemeral.google_secret_manager_secret_version.db_password.secret_data
+      value_wo_version = 1
     }
   ]
 
@@ -65,6 +72,10 @@ resource "devhub_terradesk_workspace" "example" {
     service_account_email = "devhub@my-project.iam.gserviceaccount.com"
     provider              = google_iam_workload_identity_pool_provider.devhub.name
   }
+}
+
+ephemeral "google_secret_manager_secret_version" "db_password" {
+  secret = "terradesk-db-password"
 }
 
 resource "google_iam_workload_identity_pool" "devhub" {
@@ -155,11 +166,13 @@ Optional:
 Required:
 
 - `name` (String) Secret name.
-- `value` (String, Sensitive) Secret value.
 
 Optional:
 
 - `raw` (Boolean) Expose the secret under its literal name instead of `TF_VAR_<name>`, for tooling that reads its own environment (for example `OP_SERVICE_ACCOUNT_TOKEN`).
+- `value` (String, Sensitive) Secret value. Exactly one of `value` or `value_wo` is required.
+- `value_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Write-only `value`, never stored in plan or state, so it can come from an ephemeral resource such as `google_secret_manager_secret_version`. Bump `value_wo_version` to send a new value. Requires Terraform 1.11 or later.
+- `value_wo_version` (Number) Change this to send the current `value_wo` to Devhub. Terraform can't see a change to a write-only value, so without it a rotated secret only goes out with the next change to this workspace.
 
 Read-Only:
 
